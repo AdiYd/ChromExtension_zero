@@ -5,13 +5,13 @@
   "description": "Searches for input with name='email' and fills it with 'myEmail'.",
   "permissions": ["activeTab", "scripting"],
   "icons": {
-    "16": "icons/iconOne.png",
-    "48": "icons/iconOne.png",
-    "128": "icons/iconOne.png"
+    "16": "icons/logoOne.png",
+    "48": "icons/logoOne.png",
+    "128": "icons/logoOne.png"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
       "js": ["content.js"]
     }
   ]
