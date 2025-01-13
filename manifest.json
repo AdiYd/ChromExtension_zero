@@ -1,18 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Email AutoFill Extension",
+  "name": "Postomatics Extension",
   "version": "1.0",
-  "description": "Searches for input with name='email' and fills it with 'myEmail'.",
+  "description": "This extension will help you to schedule posts on facebook",
   "permissions": ["activeTab", "scripting"],
+  "web_accessible_resources": [
+    {
+      "resources": ["scripts/*", "icons/icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
-    "16": "icons/logoOne.png",
-    "48": "icons/logoOne.png",
-    "128": "icons/logoOne.png"
+    "16": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
   },
   "content_scripts": [
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
-      "js": ["content.js"]
+      "matches": ["https://www.facebook.com/*"],
+      "js": ["scripts/content.js"]
     }
   ]
 }
