@@ -31,6 +31,35 @@ const posts = [
     ],
     fulfilled: [239847239],
   },
+  {
+    id: 2398432,
+    post: 'This is my Second post! 🎉',
+    start: '2021-07-01 12:00:00',
+    repeat: 24,
+    amount: 5,
+    groups: [{
+      id: 8347568356,
+      groupId: 1712618298975630,
+      groupName: 'תאילנד שלנו',
+    }, 
+    {
+      id: 827678,
+      groupId: 1920854911477422,
+      groupName: 'דרושים מתכנתים ואנשי פיתוח',
+    },
+    {
+      id: 239847239,
+      groupId: 1943857349578934,
+      groupName: 'שותפים fKחילחיגד אפ',
+    },
+    {
+      id: 2398472879,
+      groupId: null,
+      groupName:'aichatgptisrael',
+    }
+    ],
+    fulfilled: [827678, 239847239, 2398472879],
+  },
 ]
 
 const sleep = (s=1) => new Promise((resolve) => setTimeout(resolve, s*1e3));
@@ -40,12 +69,12 @@ const startApp = async () => {
   console.log('Checking login status...');
   if (sessionStorage.getItem('Postomatics-loggedIn') === 'true') {
     if (window.location.href.includes('/groups/joins/')) {
-      await sleep(5); // Wait for the page to load
+      await sleep(1); // Wait for the page to load
       const groups = await startGroupCollection();
       console.log('Collected groups:', groups);
       return true;
     }
-    await sleep(2); // Wait for the page to load
+    await sleep(1); // Wait for the page to load
     return App();
   }
   if (!window.location.href === 'https://www.facebook.com/') {
@@ -78,7 +107,7 @@ const startApp = async () => {
     width: '40vw',
     maxWidth: '600px',
     minWidth: '400px',
-    height: '40vh',
+    height: '50vh',
     minHeight: '400px',
     margin: 'auto',
     alignItems: 'center',
@@ -121,7 +150,13 @@ const startApp = async () => {
   const logo = document.createElement('img');
   logo.src  = chrome.runtime.getURL('icons/icon.png');
   logo.style.display = 'block';
-  logo.style.margin = '20px auto';
+  logo.style.width = '40px';
+  logo.style.height = '40px';
+  logo.style.cursor = 'pointer';
+  logo.style.margin = '15px auto';
+  logo.onclick = () => {
+    window.open('https://Taskomatic.net', '_blank');
+  };
   dialog.appendChild(logo);
 
   const title = document.createElement('h1');
@@ -136,7 +171,7 @@ const startApp = async () => {
   subTtitle.style.textAlign = 'center';
   subTtitle.style.fontSize = '0.8rem';
   subTtitle.style.color = 'gray';
-  subTtitle.style.marginBottom = '20px';
+  subTtitle.style.marginBottom = '15px';
   dialog.appendChild(subTtitle);
 
   const usernameLabel = document.createElement('label');
@@ -159,6 +194,11 @@ const startApp = async () => {
   usernameInput.placeholder = 'Enter your username';
   usernameInput.name = 'Postomatics-username';
   usernameInput.id = 'Postomatics-username';
+  usernameInput.onfocus = ()=>{
+    if (document.getElementById('login-error-message')) {
+      document.getElementById('login-error-message').remove();
+    }
+  }
   usernameInput.value = '';
   dialog.appendChild(usernameInput);
 
@@ -172,6 +212,11 @@ const startApp = async () => {
   passwordInput.placeholder = 'Enter your password';
   passwordInput.name = 'Postomatics-password';
   passwordInput.id = 'Postomatics-password';
+  passwordInput.onfocus = ()=>{
+    if (document.getElementById('login-error-message')) {
+      document.getElementById('login-error-message').remove();
+    }
+  }
   passwordInput.onkeydown = (e) => {
     if (e.key === 'Enter') {
       loginButton.click();
@@ -199,17 +244,55 @@ const startApp = async () => {
   };
   loginButton.textContent = 'Login';
   Object.assign(loginButton.style, loginButtonStyles);
-  loginButton.onclick = () => {
+  loginButton.onclick = async () => {
     const username = usernameInput.value;
     const password = passwordInput.value;
-    const isAuth = handleLogin(username, password);
-    if (isAuth) {
-    document.body.removeChild(overlay);
-    document.body.removeChild(dialog);
-    return true;
+    // Show loader on login button
+    loginButton.disabled = true;
+    loginButton.textContent = '';
+    const loader = document.createElement('div');
+    loader.className = 'loader';
+    loader.id = 'login-loader';
+    loader.style.border = '2px solid #f3f3f3';
+    loader.style.borderTop = '2px solid rgb(219, 135, 52)';
+    loader.style.borderRadius = '50%';
+    loader.style.width = '10px';
+    loader.style.height = '10px';
+    loader.style.animation = 'spin 2s linear infinite';
+    loader.style.margin = '0 auto';
+    loginButton.appendChild(loader);
+
+    // Add CSS for loader animation
+    const styleSheet = document.createElement('style');
+    styleSheet.type = 'text/css';
+    styleSheet.innerText = `
+      @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(styleSheet);
+    const isAuth =  await handleLogin(username, password);
+    if (isAuth.ok) {
+      document.body.removeChild(overlay);
+      document.body.removeChild(dialog);
+      return true;
     }
     else {
-      alert('Invalid credentials');
+      if (document.getElementById('login-error-message')) {
+        document.getElementById('login-error-message').remove();
+      }
+      const errorMessage = document.createElement('p');
+      errorMessage.textContent = isAuth.message;
+      errorMessage.id = 'login-error-message';
+      errorMessage.style.color = 'red';
+      errorMessage.style.textAlign = 'center';
+      dialog.appendChild(errorMessage);
+      loginButton.disabled = false;
+      loginButton.textContent = 'Login';
+      if (document.getElementById('login-loader')) {
+        document.getElementById('login-loader').remove();
+      }
       return false;
     }
   };
@@ -221,6 +304,20 @@ const startApp = async () => {
   };
 
   dialog.appendChild(loginButton);
+
+  const poweredByText = document.createElement('p');
+  const poweredByTextStyles = {
+    position: 'absolute',
+    bottom: '5px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    textAlign: 'center',
+    fontSize: '0.8rem',
+    color: 'gray',
+  };
+  Object.assign(poweredByText.style, poweredByTextStyles);
+  poweredByText.innerHTML = 'Powered by <a href="https://Taskomatic.net" target="_blank" style="color: blue; text-decoration: underline;">Taskomatic.net</a>';
+  dialog.appendChild(poweredByText);
 
 
   dialog.id = 'login-dialog';
@@ -234,16 +331,25 @@ const startApp = async () => {
 const handleLogin = async (username, password) => {
   console.log('Username:', username);
   console.log('Password:', password);
-  if (username === 'post' && password === '123') {
+  const serverResponse = await fetch('http://localhost:5000/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  });
+  const response = await serverResponse.json();
+  console.log('Server response:', response);
+  if (serverResponse.ok) {
     sessionStorage.setItem('Postomatics-loggedIn', 'true');
     console.log('Valid credentials');
-    await sleep(2);
+    await sleep(1);
     await App();
     // Call the main app function after successful login
-   return true
+   return {ok: true, message: response?.message};
   }
   console.log('Invalid credentials');
-  return false
+  return {ok: false, message: response?.message};
   // Add your login handling logic here
 };
 
@@ -311,7 +417,7 @@ const startGroupCollection = async () => {
 
 const postIntoInput = async (post) => {
   console.log('Group page loading, getting ready to post in the group...');
-  await sleep(2);
+  await sleep(1);
 // Click on the title of the group to reset all focused elements
   const groupTitle = document.querySelector("h1[dir='auto']");
   if (groupTitle) {
@@ -319,14 +425,14 @@ const postIntoInput = async (post) => {
   } else {
     console.error('Group title not found.');
   }
-  await sleep(4);
+  await sleep(1);
   // Wait for the "Write something..." button
   const postButton = await waitForElement("div[role='button'][tabindex='0'] > div > span");
-  await sleep(2);
+  await sleep(1);
   if (!postButton) return console.error('Post button not found');
   if (postButton.textContent.includes('Write something...')) {
     postButton.click();
-    await sleep(2);
+    await sleep(1);
     const postDialogChild =  await waitForElement("div[role='dialog'][aria-label='Create post']");
     console.log('Post dialog:', postDialogChild);
     const postDialog = postDialogChild.parentElement.parentElement;
@@ -340,12 +446,12 @@ const postIntoInput = async (post) => {
     
     postInput?.focus();
     console.log('Post input focused.');
-    await sleep(2);
+    await sleep(1);
 
     // Simulate text input
     const paragraph = postInput.querySelector('p');
     // console.log('Paragraph:', paragraph);
-    await sleep(2);
+    await sleep(1);
     if (paragraph) {
       // console.log('Paragraph element found, simulating text input...');
       paragraph.innerHTML = ''; // Clear placeholder content
@@ -388,7 +494,7 @@ const postToGroup = async (post, state, i=0) => {
       // Direct navigation if we have groupId
       state.currentGroupIndex = i;
       await saveState(state);
-      await sleep(2);
+      await sleep(1);
       const userGesture = document.createElement('a');
       userGesture.href = `https://www.facebook.com/groups/${group.groupId}`;
       userGesture.click();
@@ -403,9 +509,9 @@ const postToGroup = async (post, state, i=0) => {
       searchInput.value = group.groupName;
       searchInput.dispatchEvent(new Event('input', { bubbles: true }));
       // Wait for search results to load
-      await sleep(2);
+      await sleep(1);
       searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-      await sleep(2);  
+      await sleep(1);  
       // Wait for search results and find group
       const groupLinks = document.querySelectorAll(`a[href*='/groups/'][role='link'] span`);
       let groupLink = null;
@@ -446,7 +552,7 @@ const waitForElement = async (selector, timeout = 10*1e3) => {
   while (Date.now() - startTime < timeout) {
     const element = document.querySelector(selector);
     if (element) return element;
-    await sleep(2);
+    await sleep(1);
   }
   return null;
 };
@@ -573,6 +679,10 @@ const createBanner = async ()=>{
 
   document.body.appendChild(notificationBanner);
 };
+
+if (window.location.href === 'https://www.facebook.com/') {
+  sessionStorage.removeItem('Postomatics-loggedIn');
+}
 
 // On page load, check for saved state and resume
 (async () => {
