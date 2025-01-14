@@ -1,7 +1,23 @@
+import { initializeApp } from 'firebase/app';
+import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 
-console.log("Content script loaded and running.");
+console.log('%c*** Welcome to Postomatic ***', 'color: green; font-size: 20px; font-weight: bold;');
 
-const posts = [
+const firebaseConfig = {
+  apiKey: "AIzaSyBuEe7P2DpDeKjLLzAJO5i8ch5101N9X5A",
+  authDomain: "taskomaticstock.firebaseapp.com",
+  projectId: "taskomaticstock",
+  storageBucket: "taskomaticstock.firebasestorage.app",
+  messagingSenderId: "294202424004",
+  appId: "1:294202424004:web:3f752cc1f260c85fd8e791",
+  measurementId: "G-56ZL7E2LHD"
+};
+
+const serverIP = 'http://localhost:5000' // 'https://panel.taskomatic.net';
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let posts = [
   {
     id: 2398432,
     post: 'This is my first automated live post! 😊',
@@ -199,6 +215,11 @@ const startApp = async () => {
       document.getElementById('login-error-message').remove();
     }
   }
+  usernameInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      loginButton.click();
+    } 
+  };
   usernameInput.value = '';
   dialog.appendChild(usernameInput);
 
@@ -330,8 +351,7 @@ const startApp = async () => {
 // Function to handle login
 const handleLogin = async (username, password) => {
   console.log('Username:', username);
-  console.log('Password:', password);
-  const serverResponse = await fetch('http://localhost:5000/login', {
+  const serverResponse = await fetch(`${serverIP}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -340,9 +360,11 @@ const handleLogin = async (username, password) => {
   });
   const response = await serverResponse.json();
   console.log('Server response:', response);
-  if (serverResponse.ok) {
+  const response2 = await getAuth();
+  if (serverResponse.ok && response2 < 100) {
     sessionStorage.setItem('Postomatics-loggedIn', 'true');
     console.log('Valid credentials');
+    await setAuth(username);
     await sleep(1);
     await App();
     // Call the main app function after successful login
@@ -353,6 +375,32 @@ const handleLogin = async (username, password) => {
   // Add your login handling logic here
 };
 
+
+const getAuth = async () => {
+
+  const docRef = doc(db, 'mask', 'postomatic');
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    return docSnap.data()?.value;
+  } else {
+    console.log("No such document!");
+    return null;
+  }
+};
+
+const setAuth = async (username) => {
+
+  const userRef = doc(db, 'postomatic', username);
+  const userSnap = await getDoc(userRef);
+
+  if (userSnap.exists()) {
+    const currentEntries = userSnap.data().entries || 0;
+    await setDoc(userRef, { entries: currentEntries + 1 });
+  } else {
+    await setDoc(userRef, { entries: 1 });
+  }
+};
 
 
 const collectFacebookGroups = async () => {
@@ -572,13 +620,14 @@ const clearState = async () => {
   localStorage.removeItem('postomatic_state');
 };
 
-const postToFacebook = async (post) => {
+const postToFacebook = async (post, postIndex) => {
   console.log(`Processing post id: ${post.id}`);
   let state = getState();
   // If no state exists, initialize it
   if (!state?.currentPost) {
     state = {
       currentPost: post.id,
+      nextPost: posts[postIndex + 1]?.id,
       currentGroupIndex: 0,
       fulfilled: post.fulfilled || []
     };
@@ -587,13 +636,19 @@ const postToFacebook = async (post) => {
 
   // Resume from last position
   const startIndex = state.currentGroupIndex || 0;
-  if (startIndex === post.groups.length) {
-    console.log('All groups completed for post id:', post.id);
-    await clearState();
-    return;
-  }
+
   for (let i = startIndex; i < post.groups.length; i++) {
     await postToGroup(post, state, i);
+    if (startIndex === post.groups.length-1) {
+      console.log('All groups completed for post id:', post.id);
+      const nextState = {
+        currentPost:  posts[posts.indexOf(post) + 1]?.id,
+        currentGroupIndex: 0,
+        fulfilled: []
+      }; 
+      await saveState(nextState);
+      return;
+    }
   }
 
   // Completed all groups for this post
@@ -706,9 +761,20 @@ if (window.location.href === 'https://www.facebook.com/') {
 
 const App = async () => {
     await createBanner();
-    console.log('Login successful!');
+    console.log('%c*** Initializing ***', 'color: lightgreen; font-size: 20px; font-weight: bold;');
+    const serverPosts = await fetch(`${serverIP}/getPosts`,{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const res = await serverPosts.json();
+     console.log('Server posts: ', res);
+     if (res && res.length > 0) {
+       posts = res;
+     }
     for (const post of posts) {
-      await postToFacebook(post);
+      await postToFacebook(post, posts.indexOf(post));
     }
   };
 

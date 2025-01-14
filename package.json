@@ -1,0 +1,18 @@
+{
+  "name": "chromextension",
+  "version": "1.0.0",
+  "description": "",
+  "main": "/scripts/content.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --config webpack.config.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "firebase": "^11.1.0",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1"
+  }
+}
