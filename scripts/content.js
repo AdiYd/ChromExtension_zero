@@ -3,14 +3,14 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 
 console.log('%c*** Welcome to Postomatic ***', 'color: green; font-size: 20px; font-weight: bold;');
 
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBuEe7P2DpDeKjLLzAJO5i8ch5101N9X5A",
-  authDomain: "taskomaticstock.firebaseapp.com",
-  projectId: "taskomaticstock",
-  storageBucket: "taskomaticstock.firebasestorage.app",
-  messagingSenderId: "294202424004",
-  appId: "1:294202424004:web:3f752cc1f260c85fd8e791",
-  measurementId: "G-56ZL7E2LHD"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
 };
 
 const serverIP = 'http://localhost:5000' // 'https://panel.taskomatic.net';
