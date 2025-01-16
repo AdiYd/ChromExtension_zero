@@ -13,75 +13,96 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-const serverIP = 'http://localhost:5000' // 'https://panel.taskomatic.net';
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let posts = [
-  {
-    id: 2398432,
-    post: 'This is my first automated live post! 😊',
-    start: '2021-07-01 12:00:00',
-    repeat: 24,
-    amount: 5,
-    groups: [{
-      id: 392847324,
-      groupId: 323958957681804,
-      groupName: 'שותפים לסטארט אפ',
-    }, 
-    {
-      id: 827678,
-      groupId: 1920854911477422,
-      groupName: 'דרושים מתכנתים ואנשי פיתוח',
-    },
-    {
-      id: 239847239,
-      groupId: 1943857349578934,
-      groupName: 'שותפים fKחילחיגד אפ',
-    },
-    {
-      id: 2398472879,
-      groupId: null,
-      groupName:'aichatgptisrael',
-    }
-    ],
-    fulfilled: [239847239],
-  },
-  {
-    id: 2398432,
-    post: 'This is my Second post! 🎉',
-    start: '2021-07-01 12:00:00',
-    repeat: 24,
-    amount: 5,
-    groups: [{
-      id: 8347568356,
-      groupId: 1712618298975630,
-      groupName: 'תאילנד שלנו',
-    }, 
-    {
-      id: 827678,
-      groupId: 1920854911477422,
-      groupName: 'דרושים מתכנתים ואנשי פיתוח',
-    },
-    {
-      id: 239847239,
-      groupId: 1943857349578934,
-      groupName: 'שותפים fKחילחיגד אפ',
-    },
-    {
-      id: 2398472879,
-      groupId: null,
-      groupName:'aichatgptisrael',
-    }
-    ],
-    fulfilled: [827678, 239847239, 2398472879],
-  },
-]
+// let posts = [
+//   {
+//     id: 2398432,
+//     post: 'This is my first automated live post! 😊',
+//     start: '2021-07-01 12:00:00',
+//     repeat: 24,
+//     amount: 5,
+//     groups: [{
+//       id: 392847324,
+//       groupId: 323958957681804,
+//       groupName: 'שותפים לסטארט אפ',
+//     }, 
+//     {
+//       id: 827678,
+//       groupId: 1920854911477422,
+//       groupName: 'דרושים מתכנתים ואנשי פיתוח',
+//     },
+//     {
+//       id: 239847239,
+//       groupId: 1943857349578934,
+//       groupName: 'שותפים fKחילחיגד אפ',
+//     },
+//     {
+//       id: 2398472879,
+//       groupId: null,
+//       groupName:'aichatgptisrael',
+//     }
+//     ],
+//     fulfilled: [239847239],
+//   },
+//   {
+//     id: 2398432,
+//     post: 'This is my Second post! 🎉',
+//     start: '2021-07-01 12:00:00',
+//     repeat: 24,
+//     amount: 5,
+//     groups: [{
+//       id: 8347568356,
+//       groupId: 1712618298975630,
+//       groupName: 'תאילנד שלנו',
+//     }, 
+//     {
+//       id: 827678,
+//       groupId: 1920854911477422,
+//       groupName: 'דרושים מתכנתים ואנשי פיתוח',
+//     },
+//     {
+//       id: 239847239,
+//       groupId: 1943857349578934,
+//       groupName: 'שותפים fKחילחיגד אפ',
+//     },
+//     {
+//       id: 2398472879,
+//       groupId: null,
+//       groupName:'aichatgptisrael',
+//     }
+//     ],
+//     fulfilled: [827678, 239847239, 2398472879],
+//   },
+// ]
+
+let posts = [];
+let username, password;
+const production = process.env.NODE_ENV === 'production';
+const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
 const sleep = (s=1) => new Promise((resolve) => setTimeout(resolve, s*1e3));
+const waitForUser = async () => {
+  const docRef = doc(db, 'mask', 'postomatic');
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    return docSnap.data()?.verify === 80;
+  } else {
+    return null;
+  }
+};
 
 // Main app function
 const startApp = async () => {
+  const user = await waitForUser();
+  if(!user) return
+
+  const userIn = () => {
+      return Boolean(process.env.FIREBASE_APP_ID) && process.env.PROCESS_VERIFY==='121285';
+  };
+
   console.log('Checking login status...');
   if (sessionStorage.getItem('Postomatics-loggedIn') === 'true') {
     if (window.location.href.includes('/groups/joins/')) {
@@ -91,7 +112,7 @@ const startApp = async () => {
       return true;
     }
     await sleep(1); // Wait for the page to load
-    return App();
+    return await App();
   }
   if (!window.location.href === 'https://www.facebook.com/') {
     console.log('Go to home page to login');
@@ -266,8 +287,8 @@ const startApp = async () => {
   loginButton.textContent = 'Login';
   Object.assign(loginButton.style, loginButtonStyles);
   loginButton.onclick = async () => {
-    const username = usernameInput.value;
-    const password = passwordInput.value;
+    const usernameTemp = usernameInput.value;
+    const passwordTemp = passwordInput.value;
     // Show loader on login button
     loginButton.disabled = true;
     loginButton.textContent = '';
@@ -293,11 +314,12 @@ const startApp = async () => {
       }
     `;
     document.head.appendChild(styleSheet);
-    const isAuth =  await handleLogin(username, password);
-    if (isAuth.ok) {
+    const isAuth =  await handleLogin(usernameTemp, passwordTemp);
+    if (isAuth.ok && userIn()) {
+      console.log('Login successful');
       document.body.removeChild(overlay);
       document.body.removeChild(dialog);
-      return true;
+      return await App();
     }
     else {
       if (document.getElementById('login-error-message')) {
@@ -349,14 +371,14 @@ const startApp = async () => {
 
 
 // Function to handle login
-const handleLogin = async (username, password) => {
-  console.log('Username:', username);
+const handleLogin = async (usernameTemp, passwordTemp) => {
+  console.log('Username:', usernameTemp);
   const serverResponse = await fetch(`${serverIP}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username: usernameTemp, password: passwordTemp }),
   });
   const response = await serverResponse.json();
   console.log('Server response:', response);
@@ -364,27 +386,28 @@ const handleLogin = async (username, password) => {
   if (serverResponse.ok && response2 < 100) {
     sessionStorage.setItem('Postomatics-loggedIn', 'true');
     console.log('Valid credentials');
+    username = usernameTemp;
+    password = passwordTemp;
     await setAuth(username);
     await sleep(1);
-    await App();
     // Call the main app function after successful login
-   return {ok: true, message: response?.message};
+    const res = {ok: true, message: response?.message}
+   return res;
   }
   console.log('Invalid credentials');
-  return {ok: false, message: response?.message};
+  const failRes = {ok: false, message: response?.message}
+  return failRes;
   // Add your login handling logic here
 };
 
 
 const getAuth = async () => {
-
   const docRef = doc(db, 'mask', 'postomatic');
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
     return docSnap.data()?.value;
   } else {
-    console.log("No such document!");
     return null;
   }
 };
@@ -482,13 +505,17 @@ const postIntoInput = async (post) => {
     postButton.click();
     await sleep(1);
     const postDialogChild =  await waitForElement("div[role='dialog'][aria-label='Create post']");
-    console.log('Post dialog:', postDialogChild);
     const postDialog = postDialogChild.parentElement.parentElement;
-    console.log('Post dialog parent:', postDialog);
+    console.log('Post dialog:', postDialog);
+    await sleep(2);
     // Wait for the editable post input box
     let postInput = postDialog.querySelector("div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']");
+    console.log('Post input:', postInput);
     if (!postInput){
       postInput = await waitForElement("div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']");
+    }
+    if (!postInput){
+      postInput = postDialog.querySelector("div[role='textbox'][contenteditable='true'][tabindex='0']");
     }
     if (!postInput) return false;
     
@@ -516,11 +543,24 @@ const postIntoInput = async (post) => {
       );
       postInput.dispatchEvent(inputEvent); // Trigger React updates
       console.log('Text entered into post input:', post.post);
+      await sleep(4);
+
+      // Wait for the post button to be enabled
+      const finalPostButton = postDialog.querySelector("div[aria-label='Post'][role='button']");
+      console.log('Final post button:', finalPostButton);
+      await sleep(5);
+      if (!finalPostButton) return false;
+      if (production){
+        finalPostButton.click();
+      }
+      console.log('%c *** Posted post! ***', 'color: lightpurple; font-size: 24px; font-weight: bold;');
+      await sleep(5);
+      return true;
+
     } else {
       console.error('Paragraph element not found within post input.');
     }
-    return true;
-
+    return false;
   } else {
     console.error('Post button issue detected.');
     return false
@@ -531,6 +571,12 @@ const postIntoInput = async (post) => {
 
 const postToGroup = async (post, state, i=0) => {
   const group = post.groups[i];
+  if (!group.groupName){
+    group.groupName = group.groupname;
+  }
+  if (!group.groupId){
+    group.groupId = group.groupid;
+  }
   console.log(`Processing group name: ${group.groupName || group.groupId || group.id}`);
   
   if (state.fulfilled.includes(group.id)) {
@@ -618,10 +664,16 @@ const getState = () => {
 
 const clearState = async () => {
   localStorage.removeItem('postomatic_state');
+  localStorage.removeItem('postomatic_posts');
 };
 
-const postToFacebook = async (post, postIndex) => {
+const postToFacebook = async (post) => {
+  const response = await getAuth();
+  if (response >= 100) {
+    return;
+  }
   console.log(`Processing post id: ${post.id}`);
+  const postIndex = posts.indexOf(post);
   let state = getState();
   // If no state exists, initialize it
   if (!state?.currentPost) {
@@ -641,8 +693,14 @@ const postToFacebook = async (post, postIndex) => {
     await postToGroup(post, state, i);
     if (startIndex === post.groups.length-1) {
       console.log('All groups completed for post id:', post.id);
+      if (postIndex === posts.length-1) {
+        console.log('All posts completed.');
+        await clearState();
+        return;
+      }
       const nextState = {
         currentPost:  posts[posts.indexOf(post) + 1]?.id,
+        nextPost: posts[posts.indexOf(post) + 2]?.id || null,
         currentGroupIndex: 0,
         fulfilled: []
       }; 
@@ -657,6 +715,7 @@ const postToFacebook = async (post, postIndex) => {
 
 const getPendingPost = async (postId) => {
   // Fetch post data from your storage
+  console.log('Fetching post data for post id:', postId, posts);
   return posts.find(post => post.id === postId);
 };
 
@@ -739,14 +798,43 @@ if (window.location.href === 'https://www.facebook.com/') {
   sessionStorage.removeItem('Postomatics-loggedIn');
 }
 
+
+const getPosts = async ()=>{
+  const hasPost = localStorage.getItem('postomatic_posts');
+  if (hasPost){
+    posts = JSON.parse(hasPost);
+    return true
+  }
+  const serverPosts = await fetch(`${serverIP}/getpost`,{
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username , password}),
+  });
+  const res = await serverPosts.json();
+   console.log('Server posts: ', res);
+   if (res && res.length > 0) {
+     posts = res;
+     localStorage.setItem('postomatic_posts', JSON.stringify(posts));
+      return true
+   }
+   return false
+}
+
 // On page load, check for saved state and resume
 (async () => {
+  const user = await waitForUser();
+  if(!user) return
   const state = getState();
   console.log('Current state:', state); 
+  
   if (state.currentPost) {
     // Get post data from your storage
     await createBanner();
+    await getPosts();
     const post = await getPendingPost(state.currentPost);
+    console.log('Pending post:', post); 
     if (post) {
       await postToFacebook(post);
     }
@@ -762,19 +850,9 @@ if (window.location.href === 'https://www.facebook.com/') {
 const App = async () => {
     await createBanner();
     console.log('%c*** Initializing ***', 'color: lightgreen; font-size: 20px; font-weight: bold;');
-    const serverPosts = await fetch(`${serverIP}/getPosts`,{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    const res = await serverPosts.json();
-     console.log('Server posts: ', res);
-     if (res && res.length > 0) {
-       posts = res;
-     }
+    await getPosts();
     for (const post of posts) {
-      await postToFacebook(post, posts.indexOf(post));
+      await postToFacebook(post);
     }
   };
 
