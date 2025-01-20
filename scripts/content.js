@@ -15,7 +15,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
 // let posts = [
 //   {
 //     id: 2398432,
@@ -79,7 +78,7 @@ const db = getFirestore(app);
 
 let posts = [];
 let username, password;
-const production = process.env.NODE_ENV === 'production';
+const production = false // process.env.NODE_ENV === 'production';
 const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
 const sleep = (s=1) => new Promise((resolve) => setTimeout(resolve, s*1e3));
@@ -369,7 +368,6 @@ const startApp = async () => {
   document.body.appendChild(dialog);
 };
 
-
 // Function to handle login
 const handleLogin = async (usernameTemp, passwordTemp) => {
   console.log('Username:', usernameTemp);
@@ -383,7 +381,7 @@ const handleLogin = async (usernameTemp, passwordTemp) => {
   const response = await serverResponse.json();
   console.log('Server response:', response);
   const response2 = await getAuth();
-  if (serverResponse.ok && response2 < 100) {
+  if (serverResponse.ok && response2.verify < 100) {
     sessionStorage.setItem('Postomatics-loggedIn', 'true');
     console.log('Valid credentials');
     username = usernameTemp;
@@ -400,13 +398,12 @@ const handleLogin = async (usernameTemp, passwordTemp) => {
   // Add your login handling logic here
 };
 
-
 const getAuth = async () => {
   const docRef = doc(db, 'mask', 'postomatic');
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    return docSnap.data()?.value;
+    return docSnap.data();
   } else {
     return null;
   }
@@ -424,7 +421,6 @@ const setAuth = async (username) => {
     await setDoc(userRef, { entries: 1 });
   }
 };
-
 
 const collectFacebookGroups = async () => {
   // Validate page
@@ -475,7 +471,6 @@ const collectFacebookGroups = async () => {
   return Array.from(groupsData).map(item => JSON.parse(item));
 };
 
-// Usage
 const startGroupCollection = async () => {
   collectFacebookGroups()
     .then(groups => {
@@ -487,90 +482,194 @@ const startGroupCollection = async () => {
 };
 
 const postIntoInput = async (post) => {
-  console.log('Group page loading, getting ready to post in the group...');
   await sleep(1);
 // Click on the title of the group to reset all focused elements
-  const groupTitle = document.querySelector("h1[dir='auto']");
-  if (groupTitle) {
-    groupTitle.click();
-  } else {
-    console.error('Group title not found.');
-  }
+  const getData = await getAuth();
+  const option = getData.option;
+  console.log('Post flow:', option);
   await sleep(1);
   // Wait for the "Write something..." button
   const postButton = await waitForElement("div[role='button'][tabindex='0'] > div > span");
   await sleep(1);
-  if (!postButton) return console.error('Post button not found');
+  if (!postButton) {
+    console.error('Create a post button not found');
+    await sleep(40);
+    return false;
+  }
   if (postButton.textContent.includes('Write something...')) {
     postButton.click();
-    await sleep(1);
+    await sleep(3);
     const postDialogChild =  await waitForElement("div[role='dialog'][aria-label='Create post']");
     const postDialog = postDialogChild.parentElement.parentElement;
+    if (!postDialog) {
+      console.error('Post dialog not found.');
+      await sleep(40);
+      return false;
+    }
     console.log('Post dialog:', postDialog);
-    await sleep(2);
-    // Wait for the editable post input box
-    let postInput = postDialog.querySelector("div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']");
-    console.log('Post input:', postInput);
-    if (!postInput){
-      postInput = await waitForElement("div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']");
-    }
-    if (!postInput){
-      postInput = postDialog.querySelector("div[role='textbox'][contenteditable='true'][tabindex='0']");
-    }
-    if (!postInput) return false;
-    
-    postInput?.focus();
-    console.log('Post input focused.');
-    await sleep(1);
+    await sleep(3);
 
-    // Simulate text input
-    const paragraph = postInput.querySelector('p');
-    // console.log('Paragraph:', paragraph);
-    await sleep(1);
-    if (paragraph) {
-      // console.log('Paragraph element found, simulating text input...');
-      paragraph.innerHTML = ''; // Clear placeholder content
-      const inputEvent = new InputEvent('input', {
+    // Find the post input
+    let postInput = null;
+    const inputSelectos =[
+      "div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']",
+      "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
+      "div[role='textbox'][contenteditable='true'][tabindex='0']"
+    ]
+
+    for (const selector of inputSelectos) {
+      postInput = postDialog.querySelector(selector);
+      if (postInput) break;
+    }
+
+    if (!postInput){
+      console.error('Post input not found.');
+      await sleep(40);
+      return false;
+    }
+
+    console.log('Post input:', postInput);
+    postInput.style.backgroundColor = 'lightyellow';
+    postInput?.focus();
+    await sleep(5);
+
+    if (option === 1) {
+      // Verify we have the correct element
+      const isTextbox = (
+        postInput.getAttribute('data-lexical-editor') === 'true' &&
+        postInput.getAttribute('role') === 'textbox' &&
+        postInput.getAttribute('contenteditable') === 'true'
+      );
+    
+      if (!isTextbox) {
+        console.error('PostInput is not the textbox element');
+        await sleep(40);
+        return false;
+      }
+    
+      // Clear existing content
+      postInput.innerHTML = '';
+      postInput.focus();
+      await sleep(1);
+    
+      // Insert new content
+      const p = document.createElement('p');
+      // No class needed, just set the text content
+      p.textContent = post.post;
+      postInput.appendChild(p);
+    
+      // Dispatch events
+      postInput.dispatchEvent(new InputEvent('input', {
         bubbles: true,
         cancelable: true,
-        data: post.post,
-      });
-      paragraph.appendChild(
-        Object.assign(document.createElement('span'), {
-          'data-lexical-text': 'true',
-          textContent: post.post,
-        })
-      );
-      postInput.dispatchEvent(inputEvent); // Trigger React updates
-      console.log('Text entered into post input:', post.post);
-      await sleep(4);
-
-      // Wait for the post button to be enabled
-      const finalPostButton = postDialog.querySelector("div[aria-label='Post'][role='button']");
-      console.log('Final post button:', finalPostButton);
-      await sleep(5);
-      if (!finalPostButton) return false;
-      if (production){
-        finalPostButton.click();
-      }
-      console.log('%c *** Posted post! ***', 'color: lightpurple; font-size: 24px; font-weight: bold;');
-      await sleep(5);
-      return true;
-
-    } else {
-      console.error('Paragraph element not found within post input.');
+        data: post.post
+      }));
     }
-    return false;
+    else if (option === 2){
+        postInput.innerHTML = `
+        <div class=""><div class=""><p dir="auto">
+          <span data-lexical-text="true">${post.post}</span>
+        </p></div></div>
+      `;
+
+      // Method 3: Try dispatching multiple events
+      const events = [
+        new InputEvent('input', { bubbles: true, cancelable: true, data: post.post }),
+        new Event('change', { bubbles: true }),
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+      ];
+
+      for (const event of events) {
+        postInput.dispatchEvent(event);
+      }
+    }
+    else if (option === 3){
+        // Simulate text input
+        const paragraph = postInput.querySelector('p');
+        // console.log('Paragraph:', paragraph);
+        await sleep(1);
+        if (paragraph) {
+          // console.log('Paragraph element found, simulating text input...');
+          paragraph.innerHTML = ''; // Clear placeholder content
+          const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: post.post,
+          });
+          paragraph.appendChild(
+            Object.assign(document.createElement('span'), {
+              'data-lexical-text': 'true',
+              textContent: post.post,
+            })
+          );
+
+          postInput.dispatchEvent(inputEvent); // Trigger React updates
+        }
+      }
+    console.log('Text entered into post input:', post.post);
+    await sleep(4);
+
+    // Find post button with multiple selectors
+    const postButtonSelectors = [
+      "div[aria-label='Post'][role='button']",
+      "div[role='button'] span:contains('Post')",
+      "div.x1i10hfl[role='button']",
+      "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')"
+    ];
+
+    let finalPostButton = null;
+    for (const selector of postButtonSelectors) {
+      finalPostButton = postDialog.querySelector(selector);
+      if (finalPostButton) {
+        break;
+      }
+    }
+
+    if (!finalPostButton) {
+      console.error('Post button not found');
+      await sleep(40);
+      return false;
+    }
+
+    // Style the button and its container
+    if (production ) {
+      // Target the inner container div that handles background
+      const buttonContainer = finalPostButton.querySelector('.x1ja2u2z');
+      if (buttonContainer) {
+        console.log('Post button:', buttonContainer);
+        buttonContainer.style.cssText = `
+          background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
+          box-shadow: 0 0 15px rgba(140, 76, 175, 0.7) !important;
+          transition: all 0.3s ease !important;
+        `;
+      } else {
+        // Fallback to main button
+        console.log('Post button: ', finalPostButton);
+        buttonContainer.style.cssText = `
+          background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
+          box-shadow: 0 0 15px rgba(140, 76, 175, 0.7) !important;
+          transition: all 0.3s ease !important;
+        `;
+      }
+    }
+
+    await sleep(5);
+    if (getData?.click || false){
+      console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 20px');
+      // finalPostButton.click();
+    }
+    await sleep(5);
+    return true;
   } else {
-    console.error('Post button issue detected.');
+    console.error('Post did not posted!');
+    await sleep(40);
     return false
   }
 
 };
 
-
-const postToGroup = async (post, state, i=0) => {
-  const group = post.groups[i];
+const postToGroup = async (post, state) => {
+  const group = post.groups[state.groupIndex];
   if (!group.groupName){
     group.groupName = group.groupname;
   }
@@ -580,19 +679,25 @@ const postToGroup = async (post, state, i=0) => {
   console.log(`Processing group name: ${group.groupName || group.groupId || group.id}`);
   
   if (state.fulfilled.includes(group.id)) {
-    return console.log(`Already posted post id: ${post.id}`);
+    console.log(`Already posted in group id: ${group.id}`);
+    return true;
+  }
+  if (!group.groupId || !group.groupName) {
+    console.error('Group ID and name not found');
+    return false
   }
 
   try {
     if (group.groupId && !window.location.href.includes(`/groups/${group.groupId}`) && !window.location.href.includes(`/groups/${group.groupName}`)) {
       // Direct navigation if we have groupId
-      state.currentGroupIndex = i;
-      await saveState(state);
-      await sleep(1);
+      // state.groupIndex = i;
+      // await saveState(state);
+      // await sleep(1);
       const userGesture = document.createElement('a');
       userGesture.href = `https://www.facebook.com/groups/${group.groupId}`;
       userGesture.click();
-      return;
+      await sleep(10);
+      return false;
     } else if (group.groupName && !window.location.href.includes(`/groups/${group.groupId}`) && !window.location.href.includes(`/groups/${group.groupName}`)) {
       // Search for group by name if no ID
       const searchInput = await waitForElement("input[type='search'][aria-label='Search Facebook']");
@@ -614,30 +719,35 @@ const postToGroup = async (post, state, i=0) => {
           groupLink = link.closest('a[href*="/groups/"]');
         }
       });
-      state.currentGroupIndex = i;
-      await saveState(state);
+      // state.groupIndex = i;
+      // await saveState(state);
       if (groupLink) {
         groupLink.click();
+        await sleep(10);
+        return false;
       } else {
         console.log('Group link not found, redirecting to group page by name...');
         const userGesture = document.createElement('a');
         userGesture.href = `https://www.facebook.com/groups/${group.groupName}`;
         userGesture.click();
+        await sleep(10);
+        return false;
       }
     }
     // Wait for group page to load
+    console.log(`%c *** Starting post in group  ${group.groupName} ***`, 'color:rgb(4, 25, 48); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #FF69B4, #9400D3);');
     const res = await postIntoInput(post);
-    if (!res) return;
-    console.log('Posted in group:', group.groupName);
+    if (!res) return false;
+    console.log(`%c *** Posted in group 🎉 ***`, 'color:rgb(211, 224, 238); font-size: 32px; border-radius: 12px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
+
     // Save progress
     state.fulfilled.push(group.id);
     await saveState(state);
-  
+    return true;
   } catch (error) {
     console.error(`Error processing group ${group.groupName}:`, error);
   }
 };
-
 
 // Helper function to wait for element
 const waitForElement = async (selector, timeout = 10*1e3) => {
@@ -651,65 +761,75 @@ const waitForElement = async (selector, timeout = 10*1e3) => {
   return null;
 };
 
-  // State management
+// State management
 const saveState = async (state) => {
   console.log('Saving state:', state);
-  await sleep(1);
-  localStorage.setItem('postomatic_state', JSON.stringify(state));
+  await sleep(4);
+  sessionStorage.setItem('postomatic_state', JSON.stringify(state));
 };
 
 const getState = () => {
-  return JSON.parse(localStorage.getItem('postomatic_state') || '{}');
+  return JSON.parse(sessionStorage.getItem('postomatic_state') || '{}');
 };
 
 const clearState = async () => {
-  localStorage.removeItem('postomatic_state');
-  localStorage.removeItem('postomatic_posts');
+  console.log('%cClearing state...', 'color: darkred; font-weight: bold;');
+  await sleep(20);
+  sessionStorage.removeItem('postomatic_state');
+  sessionStorage.removeItem('postomatic_posts');
 };
 
 const postToFacebook = async (post) => {
   const response = await getAuth();
-  if (response >= 100) {
+  if (response.value >= 100) {
     return;
   }
   console.log(`Processing post id: ${post.id}`);
   const postIndex = posts.indexOf(post);
   let state = getState();
   // If no state exists, initialize it
-  if (!state?.currentPost) {
+  if (!state || !state?.currentPost) {
     state = {
       currentPost: post.id,
-      nextPost: posts[postIndex + 1]?.id,
-      currentGroupIndex: 0,
+      postIndex,
+      nextPost: posts[postIndex + 1]?.id || null,
+      groupIndex: 0,
       fulfilled: post.fulfilled || []
     };
     await saveState(state);
   }
 
   // Resume from last position
-  const startIndex = state.currentGroupIndex || 0;
+  const startIndex = state.groupIndex || 0;
 
   for (let i = startIndex; i < post.groups.length; i++) {
-    await postToGroup(post, state, i);
+    const isPosted = await postToGroup(post, state);
+    if (!isPosted) return;  
     if (startIndex === post.groups.length-1) {
-      console.log('All groups completed for post id:', post.id);
-      if (postIndex === posts.length-1) {
-        console.log('All posts completed.');
+      console.log('%cAll groups completed for post id:', 'color: red;', post.id);
+      await sleep(10);
+      if (postIndex === posts.length-1 && i === post.groups.length-1) {
+        console.log('%cAll posts completed.', 'color: lightblue;');
+        await sleep(10);
         await clearState();
-        return;
+        return true;
       }
       const nextState = {
-        currentPost:  posts[posts.indexOf(post) + 1]?.id,
+        currentPost: posts[posts.indexOf(post) + 1]?.id || null,
+        postIndex: postIndex + 1,
         nextPost: posts[posts.indexOf(post) + 2]?.id || null,
-        currentGroupIndex: 0,
+        groupIndex: 0,
         fulfilled: []
       }; 
+      state = nextState;
       await saveState(nextState);
-      return;
+      return await postToFacebook(posts[postIndex + 1]);
+    }
+    else {
+      state.groupIndex = i + 1;
+      await saveState(state);
     }
   }
-
-  // Completed all groups for this post
 
 };
 
@@ -800,7 +920,8 @@ if (window.location.href === 'https://www.facebook.com/') {
 
 
 const getPosts = async ()=>{
-  const hasPost = localStorage.getItem('postomatic_posts');
+  const hasPost = sessionStorage.getItem('postomatic_posts');
+  await sleep(5);
   if (hasPost){
     posts = JSON.parse(hasPost);
     return true
@@ -816,7 +937,7 @@ const getPosts = async ()=>{
    console.log('Server posts: ', res);
    if (res && res.length > 0) {
      posts = res;
-     localStorage.setItem('postomatic_posts', JSON.stringify(posts));
+    sessionStorage.setItem('postomatic_posts', JSON.stringify(posts));
       return true
    }
    return false
@@ -833,7 +954,7 @@ const getPosts = async ()=>{
     // Get post data from your storage
     await createBanner();
     await getPosts();
-    const post = await getPendingPost(state.currentPost);
+    const post = await getPendingPost(state?.currentPost);
     console.log('Pending post:', post); 
     if (post) {
       await postToFacebook(post);
