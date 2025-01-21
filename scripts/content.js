@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 
-console.log('%c*** Welcome to Postomatic ***', 'color: green; font-size: 20px; font-weight: bold;');
+console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
 
 
 const firebaseConfig = {
@@ -485,8 +485,7 @@ const postIntoInput = async (post) => {
   await sleep(1);
 // Click on the title of the group to reset all focused elements
   const getData = await getAuth();
-  const option = getData.option;
-  console.log('Post flow:', option);
+  let option = getData.option;
   await sleep(1);
   // Wait for the "Write something..." button
   const postButton = await waitForElement("div[role='button'][tabindex='0'] > div > span");
@@ -531,7 +530,7 @@ const postIntoInput = async (post) => {
     console.log('Post input:', postInput);
     postInput.style.backgroundColor = 'lightyellow';
     postInput?.focus();
-    await sleep(5);
+    await sleep(2);
 
     if (option === 1) {
       // Verify we have the correct element
@@ -543,34 +542,80 @@ const postIntoInput = async (post) => {
     
       if (!isTextbox) {
         console.error('PostInput is not the textbox element');
-        await sleep(40);
-        return false;
+        option = 2;
+        // await sleep(40);
+        // return false;
       }
-    
-      // Clear existing content
-      postInput.innerHTML = '';
-      postInput.focus();
-      await sleep(1);
-    
-      // Insert new content
-      const p = document.createElement('p');
-      // No class needed, just set the text content
-      p.textContent = post.post;
-      postInput.appendChild(p);
-    
-      // Dispatch events
-      postInput.dispatchEvent(new InputEvent('input', {
-        bubbles: true,
-        cancelable: true,
-        data: post.post
-      }));
+      else{
+          // Clear existing content
+          postInput.innerHTML = '';
+          postInput.focus();
+          await sleep(1);
+        
+          // Insert new content
+          const p = document.createElement('p');
+          // No class needed, just set the text content
+          p.textContent = post.post;
+          postInput.appendChild(p);
+        
+          // Dispatch events
+          postInput.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: post.post
+          }));
+      }
     }
-    else if (option === 2){
+    if (option === 2){
+        // Simulate text input
+        const paragraph = postInput.querySelector('p');
+        // console.log('Paragraph:', paragraph);
+        await sleep(1);
+        if (!paragraph) {
+          console.error('Paragraph element not found');
+          option = 3;
+          // await sleep(40);
+          // return false;
+        }
+        else {
+          // console.log('Paragraph element found, simulating text input...');
+          paragraph.innerHTML = ''; // Clear placeholder content
+          const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: post.post,
+          });
+            paragraph.appendChild(
+            Object.assign(document.createElement('span'), {
+                'data-lexical-text': 'true',
+                'data-lexical-node': 'true',
+                'class': 'xdj266r x11i5rnm xat24cr x1mh8g0r',
+                'dir': 'auto',
+                'spellcheck': 'true',
+                'style': 'white-space: pre-wrap;',
+                'data-text': 'true',
+                textContent: post.post?.trim(),
+              })
+            );
+
+          postInput.dispatchEvent(inputEvent); // Trigger React updates
+        }
+    }
+    if (option === 3){
         postInput.innerHTML = `
-        <div class=""><div class=""><p dir="auto">
-          <span data-lexical-text="true">${post.post}</span>
-        </p></div></div>
-      `;
+            <div class="x1iorvi4 x1pi30zi" data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
+              <div class="xdj266r x11i5rnm xat24cr x1mh8g0r x1w2wdvj">
+                <p class="xdj266r x11i5rnm xat24cr x1mh8g0r" dir="auto">
+                  <span data-lexical-text="true" data-lexical-node="true" class="xdj266r x11i5rnm xat24cr x1mh8g0r">${post.post.trim()}</span>
+                </p>
+              </div>
+            </div>
+            `;
+      //   postInput.innerHTML = `
+      //   <div class=""><div class=""><p dir="auto">
+      //     <span data-lexical-text="true">${post.post}</span>
+      //   </p></div></div>
+      // `;
 
       // Method 3: Try dispatching multiple events
       const events = [
@@ -582,32 +627,18 @@ const postIntoInput = async (post) => {
       for (const event of events) {
         postInput.dispatchEvent(event);
       }
-    }
-    else if (option === 3){
-        // Simulate text input
-        const paragraph = postInput.querySelector('p');
-        // console.log('Paragraph:', paragraph);
-        await sleep(1);
-        if (paragraph) {
-          // console.log('Paragraph element found, simulating text input...');
-          paragraph.innerHTML = ''; // Clear placeholder content
-          const inputEvent = new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: post.post,
-          });
-          paragraph.appendChild(
-            Object.assign(document.createElement('span'), {
-              'data-lexical-text': 'true',
-              textContent: post.post,
-            })
-          );
-
-          postInput.dispatchEvent(inputEvent); // Trigger React updates
-        }
+      // Verify the post content was inserted correctly
+      await sleep(2);
+      const verifyPost = postInput.textContent.trim();
+      await sleep(2);
+      if (!verifyPost.includes(post.post.trim())) {
+        console.log('Post content verification failed.');
+        await sleep(10);
+        return false;
       }
-    console.log('Text entered into post input:', post.post);
-    await sleep(4);
+    }
+    console.log('Post flow:', option);
+    await sleep(2.5);
 
     // Find post button with multiple selectors
     const postButtonSelectors = [
@@ -627,36 +658,35 @@ const postIntoInput = async (post) => {
 
     if (!finalPostButton) {
       console.error('Post button not found');
-      await sleep(40);
+      await sleep(10);
       return false;
     }
 
     // Style the button and its container
-    if (production ) {
+    if (production || true ) {
       // Target the inner container div that handles background
       const buttonContainer = finalPostButton.querySelector('.x1ja2u2z');
       if (buttonContainer) {
-        console.log('Post button:', buttonContainer);
         buttonContainer.style.cssText = `
           background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
-          box-shadow: 0 0 15px rgba(140, 76, 175, 0.7) !important;
+          box-shadow: 0 -5px 15px rgba(140, 76, 175, 0.7) !important;
           transition: all 0.3s ease !important;
         `;
       } else {
         // Fallback to main button
-        console.log('Post button: ', finalPostButton);
+        console.log('Post final button: ', finalPostButton);
         buttonContainer.style.cssText = `
           background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
-          box-shadow: 0 0 15px rgba(140, 76, 175, 0.7) !important;
+          box-shadow: 0 -5px 15px rgba(140, 76, 175, 0.7) !important;
           transition: all 0.3s ease !important;
         `;
       }
     }
 
-    await sleep(5);
+    await sleep(2);
     if (getData?.click || false){
-      console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 20px');
-      // finalPostButton.click();
+      console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
+      finalPostButton.click();
     }
     await sleep(5);
     return true;
@@ -735,10 +765,10 @@ const postToGroup = async (post, state) => {
       }
     }
     // Wait for group page to load
-    console.log(`%c *** Starting post in group  ${group.groupName} ***`, 'color:rgb(4, 25, 48); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #FF69B4, #9400D3);');
+    console.log(`%c *** Starting post in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #FF69B4, #9400D3);');
     const res = await postIntoInput(post);
     if (!res) return false;
-    console.log(`%c *** Posted in group 🎉 ***`, 'color:rgb(211, 224, 238); font-size: 32px; border-radius: 12px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
+    console.log(`%c *** Posted in group 🎉 *** `, 'color:rgb(211, 224, 238); font-size: 18px; border-radius: 12px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
 
     // Save progress
     state.fulfilled.push(group.id);
@@ -773,7 +803,7 @@ const getState = () => {
 };
 
 const clearState = async () => {
-  console.log('%cClearing state...', 'color: darkred; font-weight: bold;');
+  console.log('%cClearing state...', 'color: red; font-weight: bold;');
   await sleep(20);
   sessionStorage.removeItem('postomatic_state');
   sessionStorage.removeItem('postomatic_posts');
@@ -810,7 +840,7 @@ const postToFacebook = async (post) => {
       await sleep(10);
       if (postIndex === posts.length-1 && i === post.groups.length-1) {
         console.log('%cAll posts completed.', 'color: lightblue;');
-        await sleep(10);
+        await sleep(4);
         await clearState();
         return true;
       }
@@ -970,7 +1000,8 @@ const getPosts = async ()=>{
 
 const App = async () => {
     await createBanner();
-    console.log('%c*** Initializing ***', 'color: lightgreen; font-size: 20px; font-weight: bold;');
+    
+    console.log('%c *** Initializing *** ', 'background: linear-gradient(to right,rgb(122, 145, 169), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
     await getPosts();
     for (const post of posts) {
       await postToFacebook(post);
