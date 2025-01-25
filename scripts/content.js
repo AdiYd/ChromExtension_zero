@@ -1,7 +1,9 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
 import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping } from './utils';
-
+// import puppeteer from 'puppeteer-extra';
+// import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// puppeteer.use(StealthPlugin());
 
 // console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
 
@@ -69,6 +71,36 @@ import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, c
 
 
 
+// const injectPostText = async (postInput, text) => {
+//   try {
+//       // Wait for post input
+//       // await page.waitForSelector('[contenteditable="true"][role="textbox"]');
+      
+//       // // Focus the input
+//       // const postInput = await page.$('[contenteditable="true"][role="textbox"]');
+//       await postInput.click();
+      
+//       // Clear existing content
+//       await page.evaluate(() => {
+//           const input = document.querySelector('[contenteditable="true"][role="textbox"]');
+//           input.innerHTML = '';
+//       });
+
+//       // Type text with delay
+//       await page.keyboard.type(text, { delay: 100 });
+
+//       // Verify text injection
+//       const content = await page.evaluate(() => {
+//           const input = document.querySelector('[contenteditable="true"][role="textbox"]');
+//           return input.textContent;
+//       });
+
+//       return content.includes(text);
+//   } catch (error) {
+//       console.error('Text injection failed:', error);
+//       return false;
+//   }
+// };
 
 
 // Main app function
@@ -492,13 +524,40 @@ const postIntoInput = async (post) => {
 
     console.log('Post input:', postInput);
     postInput.style.backgroundColor = 'lightyellow';
-    postInput?.focus();
+    postInput.focus();
     const postText = post.post.replace(/\s+/g, ' ').trim();
+    console.log('Post text:', postText);
     await sleep(2);
 
+    // await injectPostText(postInput, postText);
+    await sleep(8);
+
+    postInput.focus();
     if (option === 1) {
       try {
-        const success = document.execCommand('insertText', false, postText);
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(postInput);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const text = document.createTextNode(postText);
+        range.insertNode(text);
+        range.collapse(false);
+      } catch (err) {
+        console.error("Range insertion failed");
+        await simulateTyping(postInput, postText);
+        option += 1;
+      }
+  }
+
+    if (option === 2) {
+      try {
+        postInput.focus();
+        let success = document.execCommand('insertText', false, postText);
+        if (!success) {
+          success = postInput.execCommand('insertText', false, postText);
+        }
         if (!success) {
           console.error("execCommand didn't work, fallback to manual typing...");
           await simulateTyping(postInput, postText);
@@ -512,13 +571,12 @@ const postIntoInput = async (post) => {
           }));
         }
       } catch (err) {
-        console.error("execCommand error, fallback to manual typing...", err);
-        await simulateTyping(postInput, postText);
+        console.error("execCommand or manual typing error", err);
         option += 1;
       }
     }
 
-    if (option === 2) {
+    if (option === 3) {
       // Verify we have the correct element
       const isTextbox = (
         postInput.getAttribute('data-lexical-editor') === 'true' &&
@@ -552,7 +610,7 @@ const postIntoInput = async (post) => {
           }));
       }
     }
-    if (option === 3){
+    if (option === 4){
         // Simulate text input
         const paragraph = postInput.querySelector('p');
         // console.log('Paragraph:', paragraph);
@@ -587,12 +645,12 @@ const postIntoInput = async (post) => {
           postInput.dispatchEvent(inputEvent); // Trigger React updates
         }
     }
-    if (option === 4){
+    if (option === 5){
         postInput.innerHTML = `
-            <div class="x1iorvi4 x1pi30zi" data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
-              <div class="xdj266r x11i5rnm xat24cr x1mh8g0r x1w2wdvj">
-                <p class="xdj266r x11i5rnm xat24cr x1mh8g0r" dir="auto">
-                  <span data-lexical-text="true" data-lexical-node="true" class="xdj266r x11i5rnm xat24cr x1mh8g0r">${post.post.trim()}</span>
+            <div class="" data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
+              <div class="">
+                <p class="" dir="auto">
+                  <span data-lexical-text="true" data-lexical-node="true" class="">${postText}</span>
                 </p>
               </div>
             </div>
@@ -624,7 +682,7 @@ const postIntoInput = async (post) => {
       }
     }
     console.log('Post flow:', option);
-    await sleep(2);
+    await sleep(4);
 
     // Find post button with multiple selectors
     const postButtonSelectors = [
@@ -649,7 +707,7 @@ const postIntoInput = async (post) => {
     }
 
     // Style the button and its container
-    if (production || true ) {
+    if (false) {
       // Target the inner container div that handles background
       const buttonContainer = finalPostButton.querySelector('.x1ja2u2z');
       if (buttonContainer) {
@@ -669,7 +727,7 @@ const postIntoInput = async (post) => {
       }
     }
 
-    await sleep(2);
+    await sleep(4);
     if (authManager.authProvider?.click || false){
       if (!authManager.credentials || !authManager.isLoggedIn()) {
         console.error('User not logged in');
@@ -678,7 +736,7 @@ const postIntoInput = async (post) => {
       console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
       finalPostButton.click();
     }
-    await sleep(5);
+    await sleep(10);
     return true;
   } else {
     console.error('Post did not posted!');
