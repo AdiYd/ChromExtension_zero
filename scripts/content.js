@@ -1,20 +1,11 @@
-import { initializeApp } from 'firebase/app';
-import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
+import { authManager, flag } from './authManager';
+import { postManager } from './postManager';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping } from './utils';
 
-console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
+
+// console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
 
 
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 // let posts = [
 //   {
 //     id: 2398432,
@@ -76,46 +67,21 @@ const db = getFirestore(app);
 //   },
 // ]
 
-let posts = [];
-let username, password;
-const production = false // process.env.NODE_ENV === 'production';
-const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
-const sleep = (s=1) => new Promise((resolve) => setTimeout(resolve, s*1e3));
-const waitForUser = async () => {
-  const docRef = doc(db, 'mask', 'postomatic');
-  const docSnap = await getDoc(docRef);
 
-  if (docSnap.exists()) {
-    return docSnap.data()?.verify === 80;
-  } else {
-    return null;
-  }
-};
+
 
 // Main app function
 const startApp = async () => {
-  const user = await waitForUser();
-  if(!user) return
 
   const userIn = () => {
       return Boolean(process.env.FIREBASE_APP_ID) && process.env.PROCESS_VERIFY==='121285';
   };
 
-  console.log('Checking login status...');
-  if (sessionStorage.getItem('Postomatics-loggedIn') === 'true') {
-    if (window.location.href.includes('/groups/joins/')) {
-      await sleep(1); // Wait for the page to load
-      const groups = await startGroupCollection();
-      console.log('Collected groups:', groups);
-      return true;
-    }
-    await sleep(1); // Wait for the page to load
-    return await App();
-  }
   if (!window.location.href === 'https://www.facebook.com/') {
     console.log('Go to home page to login');
-    return false
+    window.location.href = 'https://www.facebook.com/';
+    return false;
   }
   // Create overlay
   const overlay = document.createElement('div');
@@ -143,13 +109,13 @@ const startApp = async () => {
     width: '40vw',
     maxWidth: '600px',
     minWidth: '400px',
-    height: '50vh',
-    minHeight: '400px',
+    height: '65vh',
+    minHeight: '450px',
     margin: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '10px',
-    padding: '2rem',
+    padding: '1rem',
     backgroundColor: 'white',
     backgroundImage: "linear-gradient(45deg,rgba(194, 189, 191, 0.27) 0%,rgba(227, 250, 249, 0.2) 100%)",
     boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
@@ -169,7 +135,7 @@ const startApp = async () => {
     fontSize: '24px',
     color: 'black',
   };
-  closeButton.textContent = '⨷';
+  closeButton.textContent = '⊗';
   Object.assign(closeButton.style, closeButtonStyles);
   closeButton.onmouseover = () => {
     closeButton.style.opacity = '0.5';
@@ -267,12 +233,50 @@ const startApp = async () => {
   Object.assign(passwordInput.style, inputStyles);
   dialog.appendChild(passwordInput);
 
+  // Create terms checkbox container
+  const termsContainer = document.createElement('div');
+  termsContainer.style.margin = '10px';
+  termsContainer.style.display = 'flex';
+  termsContainer.style.alignItems = 'start';
+
+  // Create checkbox
+  const termsCheckbox = document.createElement('input');
+  termsCheckbox.type = 'checkbox';
+  termsCheckbox.id = 'terms-checkbox';
+  termsCheckbox.style.marginRight = '10px';
+  termsCheckbox.onchange = (e) => {
+    if (!e.target.checked) {
+      document.getElementById('approve-error-message').style.visibility = 'visible';
+    } else {
+      document.getElementById('approve-error-message').style.visibility = 'hidden';
+    }
+  };
+
+  // Create label
+  const termsLabel = document.createElement('label');
+  termsLabel.htmlFor = 'terms-checkbox';
+  termsLabel.innerHTML = 'I have read and agree to the <a href="https://taskomatic.net/terms" target="_blank" style="color: blue; text-decoration: underline;">Terms and Conditions</a>';
+  termsLabel.style.fontSize = '0.8rem';
+
+  termsContainer.appendChild(termsCheckbox);
+  termsContainer.appendChild(termsLabel);
+  dialog.appendChild(termsContainer);
+
+  const errorMessageApprove = document.createElement('p');
+  errorMessageApprove.textContent = 'Please accept the Terms and Conditions';
+  errorMessageApprove.id = 'approve-error-message';
+  errorMessageApprove.style.color = 'red';
+  errorMessageApprove.style.margin = '5px auto';
+  errorMessageApprove.style.marginLeft = '10px';
+  errorMessageApprove.style.textAlign = 'start';
+  errorMessageApprove.style.visibility = 'hidden';
+  dialog.appendChild(errorMessageApprove);
  
   const loginButtonStyles = {
     display: 'block',
     width: '150px',
     height: '40px',
-    margin: '20px auto',
+    margin: '10px auto',
     backgroundImage: 'linear-gradient(to right, #1abc9c,rgba(26, 188, 75, 0.48))',
     color: 'black',
     borderRadius: '12px',
@@ -286,8 +290,14 @@ const startApp = async () => {
   loginButton.textContent = 'Login';
   Object.assign(loginButton.style, loginButtonStyles);
   loginButton.onclick = async () => {
-    const usernameTemp = usernameInput.value;
-    const passwordTemp = passwordInput.value;
+    if (!termsCheckbox.checked) {
+      if (document.getElementById('approve-error-message')) {
+        document.getElementById('approve-error-message').style.visibility = 'visible';
+      }
+      return;
+    }
+    const username = usernameInput.value;
+    const password = passwordInput.value;
     // Show loader on login button
     loginButton.disabled = true;
     loginButton.textContent = '';
@@ -313,12 +323,16 @@ const startApp = async () => {
       }
     `;
     document.head.appendChild(styleSheet);
-    const isAuth =  await handleLogin(usernameTemp, passwordTemp);
+    const isAuth =  await authManager.login(username, password);
     if (isAuth.ok && userIn()) {
-      console.log('Login successful');
+      console.log('%c +++ Login successful +++', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       document.body.removeChild(overlay);
       document.body.removeChild(dialog);
-      return await App();
+      
+      postManager.initialize();
+      await createBanner()
+      await sleep(5)
+      // return await App();
     }
     else {
       if (document.getElementById('login-error-message')) {
@@ -328,6 +342,7 @@ const startApp = async () => {
       errorMessage.textContent = isAuth.message;
       errorMessage.id = 'login-error-message';
       errorMessage.style.color = 'red';
+      errorMessage.style.margin = '5px auto';
       errorMessage.style.textAlign = 'center';
       dialog.appendChild(errorMessage);
       loginButton.disabled = false;
@@ -368,59 +383,6 @@ const startApp = async () => {
   document.body.appendChild(dialog);
 };
 
-// Function to handle login
-const handleLogin = async (usernameTemp, passwordTemp) => {
-  console.log('Username:', usernameTemp);
-  const serverResponse = await fetch(`${serverIP}/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username: usernameTemp, password: passwordTemp }),
-  });
-  const response = await serverResponse.json();
-  console.log('Server response:', response);
-  const response2 = await getAuth();
-  if (serverResponse.ok && response2.verify < 100) {
-    sessionStorage.setItem('Postomatics-loggedIn', 'true');
-    console.log('Valid credentials');
-    username = usernameTemp;
-    password = passwordTemp;
-    await setAuth(username);
-    await sleep(1);
-    // Call the main app function after successful login
-    const res = {ok: true, message: response?.message}
-   return res;
-  }
-  console.log('Invalid credentials');
-  const failRes = {ok: false, message: response?.message}
-  return failRes;
-  // Add your login handling logic here
-};
-
-const getAuth = async () => {
-  const docRef = doc(db, 'mask', 'postomatic');
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return null;
-  }
-};
-
-const setAuth = async (username) => {
-
-  const userRef = doc(db, 'postomatic', username);
-  const userSnap = await getDoc(userRef);
-
-  if (userSnap.exists()) {
-    const currentEntries = userSnap.data().entries || 0;
-    await setDoc(userRef, { entries: currentEntries + 1 });
-  } else {
-    await setDoc(userRef, { entries: 1 });
-  }
-};
 
 const collectFacebookGroups = async () => {
   // Validate page
@@ -482,10 +444,11 @@ const startGroupCollection = async () => {
 };
 
 const postIntoInput = async (post) => {
+  // if (!flag.main) return false;
   await sleep(1);
 // Click on the title of the group to reset all focused elements
-  const getData = await getAuth();
-  let option = getData.option;
+
+  let option = authManager?.authProvider?.option || 1;
   await sleep(1);
   // Wait for the "Write something..." button
   const postButton = await waitForElement("div[role='button'][tabindex='0'] > div > span");
@@ -530,9 +493,32 @@ const postIntoInput = async (post) => {
     console.log('Post input:', postInput);
     postInput.style.backgroundColor = 'lightyellow';
     postInput?.focus();
+    const postText = post.post.replace(/\s+/g, ' ').trim();
     await sleep(2);
 
     if (option === 1) {
+      try {
+        const success = document.execCommand('insertText', false, postText);
+        if (!success) {
+          console.error("execCommand didn't work, fallback to manual typing...");
+          await simulateTyping(postInput, postText);
+          option += 1;
+        } else {
+          // dispatch event כדי לעדכן את React
+          postInput.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: postText,
+          }));
+        }
+      } catch (err) {
+        console.error("execCommand error, fallback to manual typing...", err);
+        await simulateTyping(postInput, postText);
+        option += 1;
+      }
+    }
+
+    if (option === 2) {
       // Verify we have the correct element
       const isTextbox = (
         postInput.getAttribute('data-lexical-editor') === 'true' &&
@@ -542,7 +528,7 @@ const postIntoInput = async (post) => {
     
       if (!isTextbox) {
         console.error('PostInput is not the textbox element');
-        option = 2;
+        option += 1;
         // await sleep(40);
         // return false;
       }
@@ -555,26 +541,26 @@ const postIntoInput = async (post) => {
           // Insert new content
           const p = document.createElement('p');
           // No class needed, just set the text content
-          p.textContent = post.post;
+          p.textContent = postText;
           postInput.appendChild(p);
         
           // Dispatch events
           postInput.dispatchEvent(new InputEvent('input', {
             bubbles: true,
             cancelable: true,
-            data: post.post
+            data: postText
           }));
       }
     }
-    if (option === 2){
+    if (option === 3){
         // Simulate text input
         const paragraph = postInput.querySelector('p');
         // console.log('Paragraph:', paragraph);
         await sleep(1);
         if (!paragraph) {
           console.error('Paragraph element not found');
-          option = 3;
-          // await sleep(40);
+          option += 1;
+          // await sleep(10);
           // return false;
         }
         else {
@@ -583,7 +569,7 @@ const postIntoInput = async (post) => {
           const inputEvent = new InputEvent('input', {
             bubbles: true,
             cancelable: true,
-            data: post.post,
+            data: postText,
           });
             paragraph.appendChild(
             Object.assign(document.createElement('span'), {
@@ -594,14 +580,14 @@ const postIntoInput = async (post) => {
                 'spellcheck': 'true',
                 'style': 'white-space: pre-wrap;',
                 'data-text': 'true',
-                textContent: post.post?.trim(),
+                textContent: postText,
               })
             );
 
           postInput.dispatchEvent(inputEvent); // Trigger React updates
         }
     }
-    if (option === 3){
+    if (option === 4){
         postInput.innerHTML = `
             <div class="x1iorvi4 x1pi30zi" data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
               <div class="xdj266r x11i5rnm xat24cr x1mh8g0r x1w2wdvj">
@@ -638,7 +624,7 @@ const postIntoInput = async (post) => {
       }
     }
     console.log('Post flow:', option);
-    await sleep(2.5);
+    await sleep(2);
 
     // Find post button with multiple selectors
     const postButtonSelectors = [
@@ -684,7 +670,11 @@ const postIntoInput = async (post) => {
     }
 
     await sleep(2);
-    if (getData?.click || false){
+    if (authManager.authProvider?.click || false){
+      if (!authManager.credentials || !authManager.isLoggedIn()) {
+        console.error('User not logged in');
+        return false;
+      }
       console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
       finalPostButton.click();
     }
@@ -698,315 +688,155 @@ const postIntoInput = async (post) => {
 
 };
 
-const postToGroup = async (post, state) => {
-  const group = post.groups[state.groupIndex];
-  if (!group.groupName){
-    group.groupName = group.groupname;
-  }
-  if (!group.groupId){
-    group.groupId = group.groupid;
-  }
-  console.log(`Processing group name: ${group.groupName || group.groupId || group.id}`);
+export const postToGroup = async (post) => {
   
-  if (state.fulfilled.includes(group.id)) {
-    console.log(`Already posted in group id: ${group.id}`);
-    return true;
-  }
-  if (!group.groupId || !group.groupName) {
-    console.error('Group ID and name not found');
-    return false
-  }
+  const state = postManager.state;
+  const group = post.groups[state.groupIndex];
 
   try {
-    if (group.groupId && !window.location.href.includes(`/groups/${group.groupId}`) && !window.location.href.includes(`/groups/${group.groupName}`)) {
-      // Direct navigation if we have groupId
-      // state.groupIndex = i;
-      // await saveState(state);
-      // await sleep(1);
-      const userGesture = document.createElement('a');
-      userGesture.href = `https://www.facebook.com/groups/${group.groupId}`;
-      userGesture.click();
-      await sleep(10);
-      return false;
-    } else if (group.groupName && !window.location.href.includes(`/groups/${group.groupId}`) && !window.location.href.includes(`/groups/${group.groupName}`)) {
-      // Search for group by name if no ID
-      const searchInput = await waitForElement("input[type='search'][aria-label='Search Facebook']");
-      if (!searchInput) return console.log('Search input not found');
+      if (!authManager.credentials || !authManager.isLoggedIn()) {
+        return {status: false, message: 'User not logged in'};
+    }
+      // Normalize group data
+      group.groupName = group.groupName || group.groupname;
+      group.groupId = group.groupId || group.groupid;
+
+      // Check if already posted
+      if (state.fulfilled.includes(group.id)) {
+          console.log(`Already posted in group ${group.id}`);
+          return {status: true, message: 'Already posted'};
+      }
+
+      // Validate group data
+      if (!group.groupId && !group.groupName) {
+          return {status: false, message: 'Invalid group data'};
+      }
+
+      // Navigate to group
+      if (!window.location.href.includes(`/groups/${group.groupId}`)) {
+          const url = `https://www.facebook.com/groups/${group.groupId}`;
+          window.location.href = url;
+          await sleep(10);
+          return {status: false, message: 'Navigating to group'};
+      }
+
+      // Post content
+      console.log(`%c *** Posting in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg,rgb(213, 58, 66), #9400D3);');
+      const posted = await postIntoInput(post);
       
-      searchInput.focus();
-      await sleep(1);
-      searchInput.value = group.groupName;
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      // Wait for search results to load
-      await sleep(1);
-      searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-      await sleep(1);  
-      // Wait for search results and find group
-      const groupLinks = document.querySelectorAll(`a[href*='/groups/'][role='link'] span`);
-      let groupLink = null;
-      groupLinks.forEach(link => {
-        if (link.textContent.includes(group.groupName)) {
-          groupLink = link.closest('a[href*="/groups/"]');
-        }
-      });
-      // state.groupIndex = i;
-      // await saveState(state);
-      if (groupLink) {
-        groupLink.click();
-        await sleep(10);
-        return false;
-      } else {
-        console.log('Group link not found, redirecting to group page by name...');
-        const userGesture = document.createElement('a');
-        userGesture.href = `https://www.facebook.com/groups/${group.groupName}`;
-        userGesture.click();
-        await sleep(10);
-        return false;
+      if (!posted) {
+          postManager.saveState();
+          if (state.retryCount > 3) {
+              throw new Error('Max retries exceeded');
+          }
+          return {status: false, message: 'Post failed'};
       }
-    }
-    // Wait for group page to load
-    console.log(`%c *** Starting post in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #FF69B4, #9400D3);');
-    const res = await postIntoInput(post);
-    if (!res) return false;
-    console.log(`%c *** Posted in group 🎉 *** `, 'color:rgb(211, 224, 238); font-size: 18px; border-radius: 12px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
-
-    // Save progress
-    state.fulfilled.push(group.id);
-    await saveState(state);
-    return true;
+      console.log(`%c *** Posted in group 🎉 *** `, 'color:rgb(211, 224, 238); font-size: 18px; border-radius: 12px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
+      // Reset retry counter on success
+      state.retryCount = 0;
+      postManager.saveState();
+      
+      return {status: true, message: 'Post successful'};
   } catch (error) {
-    console.error(`Error processing group ${group.groupName}:`, error);
+      console.error(`Error in group ${group.groupName}:`, error);
+      return {status: false, message: error.message};
   }
 };
 
-// Helper function to wait for element
-const waitForElement = async (selector, timeout = 10*1e3) => {
-  const startTime = Date.now();
-  
-  while (Date.now() - startTime < timeout) {
-    const element = document.querySelector(selector);
-    if (element) return element;
-    await sleep(1);
-  }
-  return null;
-};
+export const postToFacebook = async (post) => {
+  const state = postManager.state;
 
-// State management
-const saveState = async (state) => {
-  console.log('Saving state:', state);
-  await sleep(4);
-  sessionStorage.setItem('postomatic_state', JSON.stringify(state));
-};
-
-const getState = () => {
-  return JSON.parse(sessionStorage.getItem('postomatic_state') || '{}');
-};
-
-const clearState = async () => {
-  console.log('%cClearing state...', 'color: red; font-weight: bold;');
-  await sleep(20);
-  sessionStorage.removeItem('postomatic_state');
-  sessionStorage.removeItem('postomatic_posts');
-};
-
-const postToFacebook = async (post) => {
-  const response = await getAuth();
-  if (response.value >= 100) {
-    return;
-  }
-  console.log(`Processing post id: ${post.id}`);
-  const postIndex = posts.indexOf(post);
-  let state = getState();
-  // If no state exists, initialize it
-  if (!state || !state?.currentPost) {
-    state = {
-      currentPost: post.id,
-      postIndex,
-      nextPost: posts[postIndex + 1]?.id || null,
-      groupIndex: 0,
-      fulfilled: post.fulfilled || []
-    };
-    await saveState(state);
-  }
-
-  // Resume from last position
-  const startIndex = state.groupIndex || 0;
-
-  for (let i = startIndex; i < post.groups.length; i++) {
-    const isPosted = await postToGroup(post, state);
-    if (!isPosted) return;  
-    if (startIndex === post.groups.length-1) {
-      console.log('%cAll groups completed for post id:', 'color: red;', post.id);
-      await sleep(10);
-      if (postIndex === posts.length-1 && i === post.groups.length-1) {
-        console.log('%cAll posts completed.', 'color: lightblue;');
-        await sleep(4);
-        await clearState();
-        return true;
+  try {
+      if (!authManager.credentials || !authManager.isLoggedIn()) {
+          throw new Error('User not logged in');
       }
-      const nextState = {
-        currentPost: posts[posts.indexOf(post) + 1]?.id || null,
-        postIndex: postIndex + 1,
-        nextPost: posts[posts.indexOf(post) + 2]?.id || null,
-        groupIndex: 0,
-        fulfilled: []
-      }; 
-      state = nextState;
-      await saveState(nextState);
-      return await postToFacebook(posts[postIndex + 1]);
-    }
-    else {
-      state.groupIndex = i + 1;
-      await saveState(state);
-    }
+      if (!post || !post.groups || !post.groups.length) {
+          throw new Error('Invalid post structure or groups');
+      }
+
+
+      for (let i = state.groupIndex; i < post.groups.length; i++) {
+          // Update current execution state
+          state.currentPost = post.id;
+          state.groupIndex = i;
+          postManager.saveState();
+
+          const isPosted = await postToGroup(post);
+          if (!isPosted.status) {
+              state.errors.push({
+                  postId: post.id,
+                  message: isPosted.message,
+                  groupId: post.groups[i].id,
+                  time: new Date().toISOString()
+              });
+              state.groupIndex = i + 1;
+              postManager.saveState();
+              continue;
+          }
+          else {
+            // Update success state
+            state.fulfilled.push(post.groups[i].id);
+            await setFulfilled(post.id, post.groups[i]?.id);
+            state.groupIndex = i + 1;
+            state.lastPostTime = new Date().toISOString();
+            postManager.saveState();
+          }
+      }
+
+      // Post completed successfully
+      state.currentPost = null;
+      state.groupIndex = 0;
+      state.lastSuccessfulPost = post.id;
+      state.fulfilled = [];
+      state.isProcessing = false;
+      postManager.saveState();
+      return true;
+      
+  } catch (error) {
+      console.error('Post execution failed:', error);
+      state.errors.push({
+          postId: post.id,
+          message: error.message,
+          time: new Date().toISOString()
+      });
+      postManager.saveState();
+      return false;
   }
-
 };
 
-const getPendingPost = async (postId) => {
-  // Fetch post data from your storage
-  console.log('Fetching post data for post id:', postId, posts);
-  return posts.find(post => post.id === postId);
-};
-
-const createBanner = async ()=>{
-  const notificationBanner = document.createElement('div');
-  const bannerStyle = {
-    position: 'fixed',
-    bottom: '50px',
-    right: '10px',
-    padding: '20px',
-    backgroundColor: '#1abc9c',
-    borderRadius: '5px',
-    zIndex: '1001',
-    display: 'flex',
-    backgroundImage: 'linear-gradient(45deg, #2c3e50, #4ca1af)',
-    color: 'white',
-    border: '1px solid gray',
-    boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
-    borderRadius: '12px',
-    width: 'fit-content',
-    alignItems: 'center',
-  };
-
-  Object.assign(notificationBanner.style, bannerStyle);
-
-  const absoluteCloseButton = document.createElement('span');
-  const absoluteCloseButtonStyles = {
-    position: 'absolute',
-    color: 'white',
-    padding: '4px',
-    top: '2px',
-    right: '2px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    zIndex: '1002',
-  };
-  absoluteCloseButton.textContent = '⨷';
-  Object.assign(absoluteCloseButton.style, absoluteCloseButtonStyles);
-  absoluteCloseButton.onmouseover = () => {
-    absoluteCloseButton.style.opacity = '0.5';
-  };
-  absoluteCloseButton.onmouseout = () => {
-    absoluteCloseButton.style.opacity = '1';
-  };
-  absoluteCloseButton.onclick = async () => {
-    document.body.removeChild(notificationBanner);
-    await clearState();
-    sessionStorage.removeItem('Postomatics-loggedIn');
-    console.log('Script execution finished.');
-    return true;
-  };
-
-  notificationBanner.appendChild(absoluteCloseButton);
-  const bannerLogo = document.createElement('img');
-  bannerLogo.src = chrome.runtime.getURL('icons/icon.png');
-  bannerLogo.style.width = '30px';
-  bannerLogo.style.height = '30px';
-  // bannerLogo.style.animation = 'spin 3s linear infinite';
-  // const styleSheet = document.createElement('style');
-  // styleSheet.type = 'text/css';
-  // styleSheet.innerText = `
-  //   @keyframes spin {
-  //     0% { transform: rotate(0deg); }
-  //     100% { transform: rotate(360deg); }
-  //   }
-  // `;
-  // document.head.appendChild(styleSheet);
-  bannerLogo.style.marginRight = '10px';
-
-  const bannerText = document.createElement('span');
-  bannerText.textContent = 'Postomatics running...';
-
-  notificationBanner.appendChild(bannerLogo);
-  notificationBanner.appendChild(bannerText);
-
-  document.body.appendChild(notificationBanner);
-};
-
-if (window.location.href === 'https://www.facebook.com/') {
-  sessionStorage.removeItem('Postomatics-loggedIn');
-}
 
 
-const getPosts = async ()=>{
-  const hasPost = sessionStorage.getItem('postomatic_posts');
-  await sleep(5);
-  if (hasPost){
-    posts = JSON.parse(hasPost);
-    return true
-  }
-  const serverPosts = await fetch(`${serverIP}/getpost`,{
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username , password}),
-  });
-  const res = await serverPosts.json();
-   console.log('Server posts: ', res);
-   if (res && res.length > 0) {
-     posts = res;
-    sessionStorage.setItem('postomatic_posts', JSON.stringify(posts));
-      return true
-   }
-   return false
-}
 
-// On page load, check for saved state and resume
-(async () => {
-  const user = await waitForUser();
-  if(!user) return
-  const state = getState();
-  console.log('Current state:', state); 
+
+async function initializePostomatic() {
+  console.log('%c *** Postomatic Initializing *** ', 'background: linear-gradient(to right, #4ca1af, #c4e0e5); color: black ; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(30, 18, 43, 0.3); font-size: 20px; font-weight: bold;');
   
-  if (state.currentPost) {
-    // Get post data from your storage
-    await createBanner();
-    await getPosts();
-    const post = await getPendingPost(state?.currentPost);
-    console.log('Pending post:', post); 
-    if (post) {
-      await postToFacebook(post);
-    }
-  }
-  else {
-    await startApp();
-  }
-})();
-
-
-
-
-const App = async () => {
-    await createBanner();
+  const approve = await getManagerApprove();
+  if(!approve) return
+  if (!config.appId || !config.projectId) return
     
-    console.log('%c *** Initializing *** ', 'background: linear-gradient(to right,rgb(122, 145, 169), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
-    await getPosts();
-    for (const post of posts) {
-      await postToFacebook(post);
-    }
-  };
+  // Check if already logged in
+  if (authManager.isLoggedIn()) {
+    console.log(`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+      postManager.initialize();
+      await createBanner();
+      return;
+  }
+
+  // Show login UI if needed
+  if (window.location.href === 'https://www.facebook.com/') {
+      await startApp();
+  }
+  else if (!authManager.isLoggedIn()) {
+    console.log('%c *** Go to home page to login to postomatic *** ', 'background: linear-gradient(to right, #ffd700, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
+    console.log('https://www.facebook.com/');
+  }
+
+}
+
+window.addEventListener('load', initializePostomatic);
+
+
 
 
 
