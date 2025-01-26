@@ -481,16 +481,15 @@ export const postIntoInput = async (post) => {
     }
   }
 
-  // 6) אחרי שהטקסט נכנס, נמצא את כפתור "Post" ונלחץ
   await sleep(2);
   const posted = await clickPostButton(postDialog);
   if (!posted) {
     console.error('לא נמצא כפתור Post או לא הצליח ללחוץ');
     return false;
   }
+  const postDelay = authManager.authProvider?.postDelay || (Math.random() * 3.5 + 1.5);
+  await sleep(postDelay * 60 * 1000);
 
-  // סיום
-  console.log('נראה שהפוסט הוזן ונשלח בהצלחה!');
   return true;
 };
 
@@ -694,8 +693,10 @@ async function clickPostButton(postDialog) {
   }
 
   console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
-  finalPostButton.click();
-  await sleep(3);
+  if (authManager.authProvider?.click) {
+    finalPostButton.click();
+  }
+  await sleep(10);
 
   return true;
 }
@@ -788,7 +789,9 @@ export const postToFacebook = async (post) => {
           else {
             // Update success state
             state.fulfilled.push(post.groups[i].id);
-            await setFulfilled(post.id, post.groups[i]?.id);
+            if (!post.repeat || post.repeat === 1) {
+              await setFulfilled(post.id, post.groups[i]?.id);
+            }
             state.groupIndex = i + 1;
             state.lastPostTime = new Date().toISOString();
             postManager.saveState();
