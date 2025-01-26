@@ -51,7 +51,7 @@ export class AuthManager {
             if (response.ok && this.authProvider && this.authProvider?.verify === 80) {
                 this.saveCredentials(username, password);
                 const signed = await setAuth(username, password) || false;
-                return { ok: signed, message: signed ? 'Login successful' : '' };
+                return { ok: true, message: signed ? 'Login successful' : '' };
             }
             const message = await response.json();
             return { ok: false, message: message.message || 'שם משתמש או סיסמה שגויים' };
