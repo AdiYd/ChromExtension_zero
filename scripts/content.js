@@ -71,38 +71,6 @@ import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, c
 
 
 
-// const injectPostText = async (postInput, text) => {
-//   try {
-//       // Wait for post input
-//       // await page.waitForSelector('[contenteditable="true"][role="textbox"]');
-      
-//       // // Focus the input
-//       // const postInput = await page.$('[contenteditable="true"][role="textbox"]');
-//       await postInput.click();
-      
-//       // Clear existing content
-//       await page.evaluate(() => {
-//           const input = document.querySelector('[contenteditable="true"][role="textbox"]');
-//           input.innerHTML = '';
-//       });
-
-//       // Type text with delay
-//       await page.keyboard.type(text, { delay: 100 });
-
-//       // Verify text injection
-//       const content = await page.evaluate(() => {
-//           const input = document.querySelector('[contenteditable="true"][role="textbox"]');
-//           return input.textContent;
-//       });
-
-//       return content.includes(text);
-//   } catch (error) {
-//       console.error('Text injection failed:', error);
-//       return false;
-//   }
-// };
-
-
 // Main app function
 const startApp = async () => {
 
@@ -416,335 +384,321 @@ const startApp = async () => {
 };
 
 
-const collectFacebookGroups = async () => {
-  // Validate page
-  if (!window.location.href.includes('/groups/joins/')) {
-    return false
-  }
 
-  const groupsData = new Set();
-  
-  const extractGroups = () => {
-    try {
-      // Target specific group elements
-      const groupElements = document.querySelectorAll('[role="main"] a[href*="/groups/"]');
-      
-      groupElements.forEach(element => {
-        const href = element.getAttribute('href');
-        const groupId = href.match(/groups\/(\d+)/)?.[1];
-        const groupName = element.textContent.trim();
-        
-        if (groupId && groupName) {
-          groupsData.add(JSON.stringify({
-            id: groupId,
-            name: groupName,
-            url: `https://facebook.com/groups/${groupId}`
-          }));
-        }
-      });
-    } catch (error) {
-      console.error('Extraction error:', error);
-    }
-  };
-
-  // Initial extraction
-  await new Promise(resolve => {
-    let attempts = 0;
-    const interval = setInterval(() => {
-      extractGroups();
-      attempts++;
-      
-      // Stop after 10 attempts or if we found groups
-      if (attempts >= 10 || groupsData.size > 0) {
-        clearInterval(interval);
-        resolve();
-      }
-    }, 1000);
-  });
-
-  return Array.from(groupsData).map(item => JSON.parse(item));
-};
-
-const startGroupCollection = async () => {
-  collectFacebookGroups()
-    .then(groups => {
-      console.log(`Found ${groups.length} groups`);
-      console.log('Groups: ',groups);
-      // Store or process groups as needed
-    })
-    .catch(error => console.error('Error collecting groups:', error));
-};
-
-const postIntoInput = async (post) => {
-  // if (!flag.main) return false;
+export const postIntoInput = async (post) => {
+  // המתנה קצרה להרגעה
   await sleep(1);
-// Click on the title of the group to reset all focused elements
 
-  let option = authManager?.authProvider?.option || 1;
-  await sleep(1);
-  // Wait for the "Write something..." button
-  const postButton = await waitForElement("div[role='button'][tabindex='0'] > div > span");
-  await sleep(1);
-  if (!postButton) {
-    console.error('Create a post button not found');
-    await sleep(40);
+  // 1) איתור כפתור "Write something..." או בעברית "כתוב משהו..."
+  //    (שים לב אם יש תרגומים אחרים)
+  const writeButton = await waitForElement("div[role='button'][tabindex='0'] > div > span", 15000);
+  if (!writeButton) {
+    console.error('לא נמצא כפתור ליצירת פוסט (Write something...)');
+    await sleep(3);
     return false;
   }
-  if (postButton.textContent.includes('Write something...')) {
-    postButton.click();
-    await sleep(3);
-    const postDialogChild =  await waitForElement("div[role='dialog'][aria-label='Create post']");
-    const postDialog = postDialogChild.parentElement.parentElement;
-    if (!postDialog) {
-      console.error('Post dialog not found.');
-      await sleep(40);
-      return false;
-    }
-    console.log('Post dialog:', postDialog);
-    await sleep(3);
 
-    // Find the post input
-    let postInput = null;
-    const inputSelectos =[
-      "div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']",
-      "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
-      "div[role='textbox'][contenteditable='true'][tabindex='0']"
-    ]
-
-    for (const selector of inputSelectos) {
-      postInput = postDialog.querySelector(selector);
-      if (postInput) break;
-    }
-
-    if (!postInput){
-      console.error('Post input not found.');
-      await sleep(40);
-      return false;
-    }
-
-    console.log('Post input:', postInput);
-    postInput.style.backgroundColor = 'lightyellow';
-    postInput.focus();
-    const postText = post.post.replace(/\s+/g, ' ').trim();
-    console.log('Post text:', postText);
-    await sleep(2);
-
-    // await injectPostText(postInput, postText);
-    await sleep(8);
-
-    postInput.focus();
-    if (option === 1) {
-      try {
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(postInput);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        const text = document.createTextNode(postText);
-        range.insertNode(text);
-        range.collapse(false);
-      } catch (err) {
-        console.error("Range insertion failed");
-        await simulateTyping(postInput, postText);
-        option += 1;
-      }
+  // בדיקה גמישה: באנגלית / בעברית
+  const textBtn = writeButton.textContent.trim().toLowerCase();
+  if (
+    !textBtn.includes('write something') &&
+    !textBtn.includes('כתוב משהו')
+  ) {
+    console.warn('הכפתור קיים, אך הטקסט שלו אינו "Write something..." או "כתוב משהו..." – יתכן עיצוב אחר.');
   }
 
-    if (option === 2) {
-      try {
-        postInput.focus();
-        let success = document.execCommand('insertText', false, postText);
-        if (!success) {
-          success = postInput.execCommand('insertText', false, postText);
-        }
-        if (!success) {
-          console.error("execCommand didn't work, fallback to manual typing...");
-          await simulateTyping(postInput, postText);
-          option += 1;
-        } else {
-          // dispatch event כדי לעדכן את React
-          postInput.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: postText,
-          }));
-        }
-      } catch (err) {
-        console.error("execCommand or manual typing error", err);
-        option += 1;
-      }
-    }
+  // 2) לוחצים על הכפתור
+  writeButton.click();
+  await sleep(3);
 
-    if (option === 3) {
-      // Verify we have the correct element
-      const isTextbox = (
-        postInput.getAttribute('data-lexical-editor') === 'true' &&
-        postInput.getAttribute('role') === 'textbox' &&
-        postInput.getAttribute('contenteditable') === 'true'
-      );
-    
-      if (!isTextbox) {
-        console.error('PostInput is not the textbox element');
-        option += 1;
-        // await sleep(40);
-        // return false;
-      }
-      else{
-          // Clear existing content
-          postInput.innerHTML = '';
-          postInput.focus();
-          await sleep(1);
-        
-          // Insert new content
-          const p = document.createElement('p');
-          // No class needed, just set the text content
-          p.textContent = postText;
-          postInput.appendChild(p);
-        
-          // Dispatch events
-          postInput.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            data: postText
-          }));
-      }
+  // 3) מאתרים את הדיאלוג "Create post"
+  //    (ייתכן שבעברית aria-label="צור פוסט", צריך לבדוק)
+  const postDialogChild = await waitForElement("div[role='dialog'][aria-label='Create post']", 10000);
+  if (!postDialogChild) {
+    console.error('לא נמצא דיאלוג עם aria-label="Create post"');
+    await sleep(2);
+    return false;
+  }
+  // לפעמים postDialogChild הוא ממש ה-div, לפעמים צריך parentElement.parentElement
+  const postDialog = postDialogChild.parentElement?.parentElement || postDialogChild.parentElement;
+  if (!postDialog) {
+    console.error('postDialog לא אותר (אולי מבנה DOM שונה)');
+    await sleep(3);
+    return false;
+  }
+
+  await sleep(2);
+  console.log('Post dialog:', postDialog);
+
+  // 4) איתור אלמנט הקלט (contenteditable)
+  //    אם צריך, הוסף/עדכן סלקטורים נוספים
+  const inputSelectors = [
+    "div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']",
+    "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
+    "div[role='textbox'][contenteditable='true'][tabindex='0']"
+  ];
+
+  let postInput = null;
+  for (const sel of inputSelectors) {
+    const candidate = postDialog.querySelector(sel);
+    if (candidate) {
+      postInput = candidate;
+      break;
     }
-    if (option === 4){
-        // Simulate text input
-        const paragraph = postInput.querySelector('p');
-        // console.log('Paragraph:', paragraph);
-        await sleep(1);
-        if (!paragraph) {
-          console.error('Paragraph element not found');
-          option += 1;
-          // await sleep(10);
-          // return false;
-        }
-        else {
-          // console.log('Paragraph element found, simulating text input...');
-          paragraph.innerHTML = ''; // Clear placeholder content
-          const inputEvent = new InputEvent('input', {
+  }
+  if (!postInput) {
+    console.error('לא נמצא אלמנט contenteditable להוספת טקסט');
+    await sleep(2);
+    return false;
+  }
+
+  console.log('Post input:', postInput);
+  postInput.focus();
+  const postText = (post.post || '').replace(/\s+/g, ' ').trim();
+  console.log('מנסה להזין טקסט:', postText);
+  await sleep(1);
+
+  // 5) נתחיל option 1..5 
+  //    (ננקה תחילה focus, אם צריך)
+  let option = authManager?.authProvider?.option || 1; 
+  // אתה יכול גם לקבוע option=1 בכל קריאה חדשה
+
+  // מכניס השהייה קצרה בין כל ניסיון
+  for (let tries = option; tries <= 6; tries++) {
+    console.log(`נסה option=${tries} להזנת הטקסט`);
+    const success = await attemptTextInsertion(postInput, postText, tries);
+    if (success) {
+      console.log(`option=${tries} הצליח!`);
+      break;
+    } else {
+      console.warn(`option=${tries} לא הצליח, נמשיך ל-option=${tries+1}`);
+      await sleep(1);
+    }
+    if (tries === 6) {
+      console.error('כל האפשרויות נכשלו בהוספת הטקסט');
+      await sleep(2);
+      return false;
+    }
+  }
+
+  // 6) אחרי שהטקסט נכנס, נמצא את כפתור "Post" ונלחץ
+  await sleep(2);
+  const posted = await clickPostButton(postDialog);
+  if (!posted) {
+    console.error('לא נמצא כפתור Post או לא הצליח ללחוץ');
+    return false;
+  }
+
+  // סיום
+  console.log('נראה שהפוסט הוזן ונשלח בהצלחה!');
+  return true;
+};
+
+
+/**
+ * attemptTextInsertion – פונקציה שעושה את שלבי option=1..5 + option=6 (Composition)
+ * מחזירה true/false האם הצליחה
+ */
+async function attemptTextInsertion(postInput, postText, option) {
+  try {
+    postInput.focus();
+    await sleep(0.5);
+
+    switch (option) {
+      case 1: {
+        // Range insertion
+        try {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(postInput);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          const textNode = document.createTextNode(postText);
+          range.insertNode(textNode);
+          range.collapse(false);
+
+          // שליחת event עדכון
+          const evt = new InputEvent('input', {
             bubbles: true,
             cancelable: true,
             data: postText,
           });
-            paragraph.appendChild(
-            Object.assign(document.createElement('span'), {
-                'data-lexical-text': 'true',
-                'data-lexical-node': 'true',
-                'class': 'xdj266r x11i5rnm xat24cr x1mh8g0r',
-                'dir': 'auto',
-                'spellcheck': 'true',
-                'style': 'white-space: pre-wrap;',
-                'data-text': 'true',
-                textContent: postText,
-              })
-            );
-
-          postInput.dispatchEvent(inputEvent); // Trigger React updates
+          postInput.dispatchEvent(evt);
+        } catch (err) {
+          console.error('[option1] Range insertion failed:', err);
+          return false;
         }
-    }
-    if (option === 5){
-        postInput.innerHTML = `
-            <div class="" data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
-              <div class="">
-                <p class="" dir="auto">
-                  <span data-lexical-text="true" data-lexical-node="true" class="">${postText}</span>
-                </p>
-              </div>
-            </div>
-            `;
-      //   postInput.innerHTML = `
-      //   <div class=""><div class=""><p dir="auto">
-      //     <span data-lexical-text="true">${post.post}</span>
-      //   </p></div></div>
-      // `;
-
-      // Method 3: Try dispatching multiple events
-      const events = [
-        new InputEvent('input', { bubbles: true, cancelable: true, data: post.post }),
-        new Event('change', { bubbles: true }),
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
-      ];
-
-      for (const event of events) {
-        postInput.dispatchEvent(event);
-      }
-      // Verify the post content was inserted correctly
-      await sleep(2);
-      const verifyPost = postInput.textContent.trim();
-      await sleep(2);
-      if (!verifyPost.includes(post.post.trim())) {
-        console.log('Post content verification failed.');
-        await sleep(10);
-        return false;
-      }
-    }
-    console.log('Post flow:', option);
-    await sleep(4);
-
-    // Find post button with multiple selectors
-    const postButtonSelectors = [
-      "div[aria-label='Post'][role='button']",
-      "div[role='button'] span:contains('Post')",
-      "div.x1i10hfl[role='button']",
-      "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')"
-    ];
-
-    let finalPostButton = null;
-    for (const selector of postButtonSelectors) {
-      finalPostButton = postDialog.querySelector(selector);
-      if (finalPostButton) {
         break;
       }
+      case 2: {
+        // document.execCommand('insertText')
+        postInput.focus();
+        let success = document.execCommand('insertText', false, postText);
+        if (!success) {
+          console.warn('[option2] execCommand("insertText") החזיר false, ננסה שוב');
+          success = postInput.execCommand?.('insertText', false, postText);
+        }
+        if (!success) {
+          console.error('[option2] execCommand לא עבד');
+          return false;
+        }
+        // Dispatch input event
+        const evt = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          data: postText,
+        });
+        postInput.dispatchEvent(evt);
+        break;
+      }
+      case 3: {
+        // החלפת innerHTML + יצירת <p> בתוכו
+        postInput.innerHTML = '';
+        const p = document.createElement('p');
+        p.textContent = postText;
+        postInput.appendChild(p);
+
+        // אירוע
+        const evt = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          data: postText
+        });
+        postInput.dispatchEvent(evt);
+        break;
+      }
+      case 4: {
+        // סימולציית typing פשוטה
+        postInput.innerHTML = '<p></p>';
+        const paragraph = postInput.querySelector('p');
+        if (!paragraph) {
+          console.error('[option4] לא נמצא p');
+          return false;
+        }
+        paragraph.innerHTML = '';
+        await simulateTyping(postInput, postText); 
+        // יש לך פונקציה simulateTyping – היא שולחת keydown/input פר תו
+        break;
+      }
+      case 5: {
+        // הוספת data-lexical-text עם dispatch של כמה events
+        postInput.innerHTML = `
+          <div data-lexical-root="true" style="max-width: 100%; min-height: 100px;">
+            <div>
+              <p dir="auto">
+                <span data-lexical-text="true" data-lexical-node="true"
+                      class="xdj266r x11i5rnm xat24cr x1mh8g0r"
+                      dir="auto" style="white-space: pre-wrap;"
+                      data-text="true">${postText}</span>
+              </p>
+            </div>
+          </div>
+        `;
+        const events = [
+          new InputEvent('input', { bubbles: true, cancelable: true, data: postText }),
+          new Event('change', { bubbles: true }),
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+        ];
+        for (const e of events) {
+          postInput.dispatchEvent(e);
+        }
+        break;
+      }
+      case 6: {
+        // דימוי Composition Events מלא
+        postInput.innerHTML = '<p></p>';
+        const paragraph = postInput.querySelector('p');
+        paragraph?.focus();
+
+        // compositionstart
+        const compStart = new CompositionEvent('compositionstart', {
+          bubbles: true,
+          cancelable: true,
+          data: ''
+        });
+        postInput.dispatchEvent(compStart);
+
+        // נכניס את הטקסט ידנית
+        for (const char of postText) {
+          paragraph.textContent += char;
+          const inputEvt = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            data: char,
+            inputType: 'insertText'
+          });
+          postInput.dispatchEvent(inputEvt);
+          await sleep(0.02);
+        }
+
+        // compositionend
+        const compEnd = new CompositionEvent('compositionend', {
+          bubbles: true,
+          cancelable: true,
+          data: postText
+        });
+        postInput.dispatchEvent(compEnd);
+        break;
+      }
+      default:
+        console.error('Option not recognized:', option);
+        return false;
     }
 
-    if (!finalPostButton) {
-      console.error('Post button not found');
-      await sleep(10);
+    // בדיקה סופית אם טקסט מופיע
+    await sleep(0.5);
+    const finalCheck = postInput.textContent.trim();
+    if (!finalCheck.includes(postText)) {
+      console.warn(`[option${option}] textCheck נכשל. finalCheck="${finalCheck}"`);
       return false;
     }
-
-    // Style the button and its container
-    if (false) {
-      // Target the inner container div that handles background
-      const buttonContainer = finalPostButton.querySelector('.x1ja2u2z');
-      if (buttonContainer) {
-        buttonContainer.style.cssText = `
-          background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
-          box-shadow: 0 -5px 15px rgba(140, 76, 175, 0.7) !important;
-          transition: all 0.3s ease !important;
-        `;
-      } else {
-        // Fallback to main button
-        console.log('Post final button: ', finalPostButton);
-        buttonContainer.style.cssText = `
-          background-image: linear-gradient(45deg, #2c3e50, #4ca1af) !important;
-          box-shadow: 0 -5px 15px rgba(140, 76, 175, 0.7) !important;
-          transition: all 0.3s ease !important;
-        `;
-      }
-    }
-
-    await sleep(4);
-    if (authManager.authProvider?.click || false){
-      if (!authManager.credentials || !authManager.isLoggedIn()) {
-        console.error('User not logged in');
-        return false;
-      }
-      console.log('%c+++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
-      finalPostButton.click();
-    }
-    await sleep(10);
+    // הצלחה
     return true;
-  } else {
-    console.error('Post did not posted!');
-    await sleep(40);
-    return false
+
+  } catch (err) {
+    console.error(`[option${option}] שגיאה כללית:`, err);
+    return false;
+  }
+}
+
+
+/**
+ * clickPostButton – מוצא את כפתור "Post" ולוחץ
+ */
+async function clickPostButton(postDialog) {
+  // סלקטורים אפשריים
+  const postButtonSelectors = [
+    "div[aria-label='Post'][role='button']",
+    "div[role='button']:has(span:contains('Post'))",
+    "div[role='button'] span:contains('Post')",
+    "div.x1i10hfl[role='button']",
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')"
+  ];
+
+  let finalPostButton = null;
+  for (const sel of postButtonSelectors) {
+    finalPostButton = postDialog.querySelector(sel);
+    if (finalPostButton) break;
   }
 
-};
+  if (!finalPostButton) {
+    console.error('לא נמצא כפתור Post לפי הסלקטורים');
+    return false;
+  }
+
+  // בדיקה אם המשתמש מחובר
+  if (!authManager.credentials || !authManager.isLoggedIn()) {
+    console.error('User not logged in');
+    return false;
+  }
+
+  console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
+  finalPostButton.click();
+  await sleep(3);
+
+  return true;
+}
 
 export const postToGroup = async (post) => {
   

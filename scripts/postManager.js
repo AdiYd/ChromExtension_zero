@@ -5,7 +5,7 @@ import { config, getPostById, serverIP, sleep } from "./utils";
 // State management
 const STATE_KEY = 'FB_AUTO_POST_STATE';
 const POST_TIMEOUT = 20 * 60 * 1000; // 20 minutes
-const UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const UPDATE_INTERVAL = 3 * 60 * 1000; // 3 minutes
 const flag = {
     main: Boolean(process.env.FIREBASE_APP_ID)
   }
@@ -20,7 +20,27 @@ export class PostManager {
         if (!flag.main) return;
         PostManager.instance = this;
 
+        this.updateTimer = null;
         this.state = this.loadState() || this.getInitialState();
+        this.startUpdateInterval();
+    }
+
+    startUpdateInterval() {
+        // Clear existing timer if any
+        const interval = authManager.authProvider?.updateInterval * 60 * 1000 || UPDATE_INTERVAL;
+        if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+        }
+
+        // Start new update interval
+        this.updateTimer = setInterval(async () => {
+            try {
+                await this.fetchPosts(true); // Force server update
+                console.log('Posts updated from server');
+            } catch (error) {
+                console.error('Failed to update posts:', error);
+            }
+        }, interval);
     }
 
     async initialize() {
@@ -38,7 +58,7 @@ export class PostManager {
             }
 
             this.state.posts = this.sortPosts(posts);
-            this.state.pendingPosts = [...this.state.posts];
+            this.state.pendingPosts = [...this.state.posts.filter(post => post.start >= new Date())];
             this.state.isProcessing = true;
             this.saveState();
 
@@ -82,6 +102,9 @@ export class PostManager {
     }
 
     clearState() {
+        if (this.updateTimer){
+            clearInterval(this.updateTimer);
+        }
         sessionStorage.removeItem(STATE_KEY);
     }
   
