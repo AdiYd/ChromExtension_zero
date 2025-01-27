@@ -4,7 +4,7 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { authManager } from './authManager';
 import { postManager } from './postManager';
 
-export const production = process.env.NODE_ENV === 'production';
+export const production =false // process.env.NODE_ENV === 'production';
 export const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
 export const config = {
@@ -69,6 +69,7 @@ export const createBanner = async ()=>{
       borderRadius: '5px',
       zIndex: '1001',
       display: 'flex',
+      justifyContent: 'space-between',
       backgroundImage: 'linear-gradient(45deg, #2c3e50, #4ca1af)',
       color: 'white',
       border: '1px solid gray',
@@ -76,6 +77,7 @@ export const createBanner = async ()=>{
       borderRadius: '12px',
       width: 'fit-content',
       alignItems: 'center',
+      direction: 'rtl',
     };
   
     Object.assign(notificationBanner.style, bannerStyle);
@@ -114,6 +116,7 @@ export const createBanner = async ()=>{
     bannerLogo.src = chrome.runtime.getURL('icons/icon.png');
     bannerLogo.style.width = '30px';
     bannerLogo.style.height = '30px';
+    bannerLogo.style.margin = 'auto 10px';
     // bannerLogo.style.animation = 'spin 3s linear infinite';
     // const styleSheet = document.createElement('style');
     // styleSheet.type = 'text/css';
@@ -124,7 +127,7 @@ export const createBanner = async ()=>{
     //   }
     // `;
     // document.head.appendChild(styleSheet);
-    bannerLogo.style.marginRight = '10px';
+    // bannerLogo.style.marginLeft = '10px';
   
     const bannerText = document.createElement('span');
     bannerText.textContent = 'Postomatics running...';
@@ -133,30 +136,100 @@ export const createBanner = async ()=>{
     // notificationBanner.appendChild(bannerText);
     const stateInfo = document.createElement('div');
     const stateInfoStyle = {
-        marginLeft: '20px',
-        fontSize: '14px',
+        marginRight: '10px',
+        marginLeft: '10px',
+        direction: 'rtl',
+        textAligh: 'start',
+        fontSize: '15px',
         color: 'white',
+        direction: 'rtl',
     };
     Object.assign(stateInfo.style, stateInfoStyle);
+    let i = 0;
+    while (!state.currentPost) {
+        await sleep(1);
+        i++;
+        if (i > 30) {
+            break;
+        }
+    }
     const nextPost = getPostById(state.currentPost);
     const lastPost = getPostById(state.lastSuccessfulPost);
     const nextPostText = nextPost ? nextPost?.post?.substring(0, 30) + '...' : null;
-    const lastPostText = lastPost ? lastPost?.post?.substring(0, 30) + '...' : null;
-    const nextTime = nextPost ? postManager.state.isProcessing ? 'Now' :  new Date(nextPost.start).toLocaleTimeString() : 'Not scheduled';
+    const lastPostText = lastPost ? lastPost.post?.substring(0, 30) + '...' : null;
     const errors = state.errors?.slice(-2) || [];
+    let nextTime = 'לא מתוזמן';
+
+    if (nextPost) {
+      if (postManager.state.isProcessing) {
+        nextTime = 'עכשיו';
+      } else {
+        const startDate = new Date(nextPost.start);
+         state.intervalId = setInterval(() => {
+          if (Date.now() >= startDate) {
+            nextTime = 'עכשיו';
+            clearInterval(state.intervalId);
+          } else {
+            nextTime = startDate.toLocaleTimeString();
+          }
+          stateInfo.innerHTML = `
+                ${nextPostText ? `<div><b>הפוסט הבא: </b> ${nextPostText}</div>` : ''}
+                <div><b>מתוזמן ל: </b> ${nextTime}</div>
+                ${ (startDate >= Date.now()) ? `<div><b >עולה בעוד: </b> ${new Date(startDate - Date.now()).toISOString().substr(11, 8)}</div>` : ''}
+                ${lastPostText ? `<div><b >הפוסט הקודם: </b> ${lastPostText}</div>` : ''}
+                ${errors?.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
+                `;
+        }, 1*1e3);
+      }
+    }
+
 
     stateInfo.innerHTML = `
-        ${nextPostText ? `<div><b>Next post:</b> ${nextPostText}</div>` : ''}
-        ${nextTime ? `<div><b>Scheduled:</b> ${nextTime}</div>` : ''}
-        ${lastPostText ? `<div><b>Last post:</b> ${lastPostText}</div>` : ''}
+        ${nextPostText ? `<div><b>הפוסט הבא: </b> ${nextPostText}</div>` : ''}
+        ${nextTime ? `<div><b>מתוזמן ל: </b> ${nextTime}</div>` : ''}
+        ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
         ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
     `;
 
+  
+    const newPostButton = document.createElement('div');
+    const newPostButtonStyle = {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'end', 
+      cursor: 'pointer',
+      padding: '8px 12px',
+      margin: 'auto',
+      width: 'fit-content',
+      borderRadius: '8px',
+      marginRight: '15px',
+      border: '1px solid rgba(224, 187, 149, 0.37)',
+      transition: 'background-color 0.3s'
+    };
+    Object.assign(newPostButton.style, newPostButtonStyle);
+
+    newPostButton.innerHTML = `
+      <svg style="width:16px;height:16px;margin-left:6px" viewBox="0 0 24 24">
+        <path fill="white" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+      </svg>
+      <span style="color:white;font-size:13px">פוסט חדש</span>
+    `;
+
+    newPostButton.onmouseover = () => {
+      newPostButton.style.backgroundColor = 'rgba(255,255,255,0.1)';
+    };
+    newPostButton.onmouseout = () => {
+      newPostButton.style.backgroundColor = 'transparent';
+    };
+    newPostButton.onclick = () => {
+      window.open('https://panel.taskomatic.net/login', '_blank');
+    };
     if (nextPost){
-        notificationBanner.appendChild(stateInfo);
+      notificationBanner.appendChild(stateInfo);
     } else {
-        notificationBanner.appendChild(bannerText);
+      notificationBanner.appendChild(bannerText);
     }
+    notificationBanner.appendChild(newPostButton);
     document.body.appendChild(notificationBanner);
   };
 

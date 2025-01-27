@@ -240,38 +240,56 @@ const startApp = async () => {
   termsContainer.style.alignItems = 'start';
 
   // Create checkbox
+  const terms = `
+תאריך עדכון אחרון: 1 בפברואר 2025
+
+ברוכים הבאים לאתר/לאפליקציה שלנו (להלן: "האתר"). השימוש באתר כפוף לתנאים ולהגבלות המפורטים להלן. הנך מתבקש/ת לקרוא אותם בקפידה. על־ידי גישה לאתר ו/או שימוש בו, הנך מסכים/ה לתנאים אלה במלואם. אם אינך מסכים/ה לאחד או יותר מהתנאים המפורטים, עליך להימנע משימוש באתר.
+
+1. הגדרות
+1.1 "אנחנו"/"החברה" – בעלי האתר או מפעיליו.
+1.2 "האתר" – האתר, האפליקציה, השירותים או הפלטפורמה המקוונת המוצעת על־ידינו, לרבות כל תוכן, שירות או פונקציונליות נלווים.
+1.3 "משתמש/ת" – כל אדם או גורם אחר אשר ניגש/ת לאתר או עושה בו שימוש, לרבות ללא הגבלה, גלישה, העלאת תוכן, הורדת מידע וכדומה.
+
+2. כשירות לשימוש
+2.1 השימוש באתר מותר לבגירים (מעל גיל 18) או לקטינים מעל גיל מסוים באישור הורים/אפוטרופוסים.
+2.2 החברה שומרת לעצמה את הזכות לבקש מסמכים מזהים או פרטים אישיים לצורך אימות זהות המשתמש/ת, וכן לסרב להעניק גישה או שירות למשתמש/ת אשר לא עומד/ת בתנאי הכשירות או פועל/ת בניגוד לתנאי שימוש אלה.
+
+3. שימוש באתר
+3.1 שימוש הולם: המשתמש/ת מתחייב/ת להשתמש באתר אך ורק למטרות חוקיות ובהתאם לכל דין. נאסר על המשתמש/ת לעשות שימוש שיש בו משום פגיעה, הפרעה, הגבלה או מניעת שימוש מצד משתמשים אחרים.
+3.2 רישום וחשבונות: ייתכן כי חלק מהשירותים דורשים פתיחת חשבון משתמש ורישום. על המשתמש/ת לספק פרטים נכונים, עדכניים ומלאים. המשתמש/ת אחראי/ת על שמירת סודיות פרטי ההתחברות, ועל כל פעולה שתתבצע תחת החשבון שלו/ה.
+3.3 תוכן משתמש/ת: המשתמש/ת מצהיר/ה שכל מידע, טקסט, תמונות, קבצים או כל תוכן אחר שהעלה לאתר, הינו בבעלותו/ה או שיש לו/לה את הזכות החוקית להשתמש בו. המשתמש/ת מעניק/ה לנו רישיון לא בלעדי להשתמש בתוכן לצורכי הפעלת האתר ו/או הצגתו למשתמשים אחרים.
+
+4. פרטיות
+4.1 מדיניות פרטיות: אנו אוספים מידע אישי בהתאם למדיניות הפרטיות שלנו, אשר מפורסמת באתר ומהווה חלק בלתי נפרד מתנאי שימוש אלה.
+4.2 עוגיות (Cookies): האתר עשוי להשתמש בקבצי עוגיות או בטכנולוגיות דומות על מנת לשפר את חוויית המשתמש/ת ולנתח שימוש באתר.
+
+5. קניין רוחני
+5.1 זכויות יוצרים: כל הזכויות בתכנים הכלולים באתר (טקסט, גרפיקה, לוגו, אייקונים, תמונות, תוכנה, קוד וכדומה) הינן בבעלותנו או בבעלות צדדים שלישיים אשר התירו לנו להשתמש בהם. חל איסור להעתיק, להפיץ, לשדר, לשכפל, לפרסם או להשתמש בכל אופן אחר בתכנים ללא אישור מראש ובכתב מאיתנו.
+5.2 סימני מסחר: כל סימני המסחר, הסימנים המסחריים והשמות המסחריים המופיעים באתר הם בבעלותנו או בבעלות בעליהם החוקיים. אין לראות בתנאי שימוש אלה היתר לשימוש בסימני מסחר ללא אישור כתוב.
+
+6. אחריות והגבלת אחריות
+6.1 אחריות תוכן: האתר, תכניו והשירותים שבו מוצעים כמות שהם ("As Is") וללא אחריות מכל סוג שהוא, מפורשת או משתמעת.
+6.2 שירות רציף: אנו משתדלים לשמור על זמינות האתר ושירותיו, אך איננו מתחייבים לכך שהשירות יהיה רציף, נטול טעויות או מוגן מפני גישה בלתי מורשית.
+6.3 שיפוי: המשתמש/ת מסכים/ה לשפות ולפצות את החברה בגין כל נזק, תביעה, הפסד או הוצאה (לרבות שכר טרחת עו"ד) הנובעים מהפרת תנאים אלה על־ידיו/ה.
+
+7. שינויים והפסקת שירות
+7.1 שינויים באתר: אנו שומרים לעצמנו את הזכות לשנות מעת לעת את מבנה האתר, מראהו ועיצובו, את היקף וזמינות השירותים בו וכל היבט אחר הכרוך בהם – והכול ללא צורך להודיע על כך מראש.
+7.2 הפסקת שירות: באפשרותנו להפסיק את פעילות האתר, כולו או חלקו, באופן זמני או לצמיתות, לפי שיקול דעתנו הבלעדי וללא הודעה מוקדמת.
+
+8. סיום התקשרות
+8.1 באפשרותנו, לפי שיקול דעתנו, למנוע ממשתמש/ת גישה לאתר, לבטל חשבונו/ה או לחסום את השתתפותו/ה באתר אם הפר/ה את תנאי השימוש הללו או אם קיים חשד סביר לפריצה או שימוש לרעה.
+8.2 המשתמש/ת רשאי/ת להפסיק שימוש באתר בכל עת, ולסגור את החשבון (אם קיים) באמצעות הכלים המוצעים באתר או דרך פנייה אל שירות הלקוחות שלנו.
+
+9. החוק החל וסמכות שיפוט
+9.1 על תנאים אלה ועל כל שימוש באתר יחולו דיני מדינת ישראל (או כל מדינה אחרת, בהתאם לצורך — יש להתאים לפי המיקום המשפטי הרלוונטי).
+9.2 כל סכסוך משפטי יתברר בבתי המשפט המוסמכים במחוז שבו רשומה החברה או בכל מקום מוסכם אחר, לפי שיקול דעתנו.
+  `;
+
   const termsCheckbox = document.createElement('input');
   termsCheckbox.type = 'checkbox';
   termsCheckbox.id = 'terms-checkbox';
   termsCheckbox.style.marginRight = '10px';
-  termsCheckbox.onchange = (e) => {
-    if (!e.target.checked) {
-      document.getElementById('approve-error-message').style.visibility = 'visible';
-    } else {
-      document.getElementById('approve-error-message').style.visibility = 'hidden';
-    }
-  };
 
-  // Create label
-  const termsLabel = document.createElement('label');
-  termsLabel.htmlFor = 'terms-checkbox';
-  termsLabel.innerHTML = 'I have read and agree to the <a href="https://taskomatic.net/terms" target="_blank" style="color: blue; text-decoration: underline;">Terms and Conditions</a>';
-  termsLabel.style.fontSize = '0.8rem';
-
-  termsContainer.appendChild(termsCheckbox);
-  termsContainer.appendChild(termsLabel);
-  dialog.appendChild(termsContainer);
-
-  const errorMessageApprove = document.createElement('p');
-  errorMessageApprove.textContent = 'Please accept the Terms and Conditions';
-  errorMessageApprove.id = 'approve-error-message';
-  errorMessageApprove.style.color = 'red';
-  errorMessageApprove.style.margin = '5px auto';
-  errorMessageApprove.style.marginLeft = '10px';
-  errorMessageApprove.style.textAlign = 'start';
-  errorMessageApprove.style.visibility = 'hidden';
-  dialog.appendChild(errorMessageApprove);
- 
   const loginButtonStyles = {
     display: 'block',
     width: '150px',
@@ -287,6 +305,155 @@ const startApp = async () => {
     fontSize: '1.2rem',
     transition: 'all 0.8s ease',
   };
+
+  const showTermsDialog = () => {
+    const overlay = document.createElement('div');
+   
+    const dialog = document.createElement('div');
+    const overlayStyles = {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      zIndex: '9999'
+    };
+    Object.assign(overlay.style, overlayStyles);
+
+    const dialogStyles = {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      backgroundColor: '#fff',
+      padding: '30px 50px',
+      borderRadius: '8px',
+      maxWidth: '88vw',
+      minWidth: '300px',
+      maxHeight: '88vh',
+      overflowY: 'auto',
+      zIndex: '10000'
+    };
+    Object.assign(dialog.style, dialogStyles);
+    overlay.onclick = (e) => {
+      e.stopPropagation();
+      termsCheckbox.checked = false;
+      document.getElementById('approve-error-message').style.visibility = 'visible';
+      document.body.removeChild(overlay);
+      document.body.removeChild(dialog);
+    };
+
+    const closeButton = document.createElement('span');
+    const closeButtonStyles = {
+      position: 'absolute',
+      color: 'black',
+      padding: '8px',
+      top: '5px',
+      right: '5px',
+      cursor: 'pointer',
+      fontSize: '24px',
+      color: 'black',
+    };
+    closeButton.textContent = '⊗';
+    Object.assign(closeButton.style, closeButtonStyles);
+    closeButton.onmouseover = () => {
+      closeButton.style.opacity = '0.5';
+    };
+    closeButton.onmouseout = () => {
+      closeButton.style.opacity = '1';
+    };
+    closeButton.onclick = () => {
+      termsCheckbox.checked = false;
+      document.getElementById('approve-error-message').style.visibility = 'visible';
+      document.body.removeChild(overlay);
+      document.body.removeChild(dialog);
+    };
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'תנאים והגבלות (Terms and Conditions)';
+    heading.style.textAlign = 'center'; 
+    heading.style.fontSize = '1.2rem';
+    heading.style.margin = '10px auto';
+    heading.style.direction = 'ltr';
+    
+    const text = document.createElement('pre');
+    text.textContent = terms;
+    text.style.fontSize = '0.8rem';
+    text.style.textAlign = 'start';
+    text.style.lineHeight = '1.3';
+    text.style.margin = '10px auto';
+    text.style.maxWidth = '90%';
+    text.style.textWrap = 'wrap';
+    text.style.wordBreak = 'break-word';
+    text.style.direction = 'rtl';
+
+    const approveBtn = document.createElement('button');
+    approveBtn.textContent = 'אישור';
+    approveBtn.style.marginTop = '10px';
+    Object.assign(approveBtn.style, loginButtonStyles);
+    approveBtn.onclick = () => {
+      termsCheckbox.checked = true;
+      document.getElementById('approve-error-message').style.visibility = 'hidden';
+      document.body.removeChild(overlay);
+      document.body.removeChild(dialog);
+    };
+
+    dialog.appendChild(closeButton);
+    dialog.appendChild(heading);
+    dialog.appendChild(text);
+    dialog.appendChild(approveBtn);
+    document.body.appendChild(overlay);
+    document.body.appendChild(dialog);
+  };
+
+  // termsCheckbox.onclick = (e) => {
+  //   // Prevent default checking
+  //   if (!termsCheckbox.checked) {
+  //     e.preventDefault();
+  //     showTermsDialog();
+  //   }
+  // };
+
+  termsCheckbox.onchange = (e) => {
+    if (!e.target.checked) {
+      document.getElementById('approve-error-message').style.visibility = 'visible';
+    } else {
+      document.getElementById('approve-error-message').style.visibility = 'hidden';
+    }
+  };
+
+  // Create label
+  const termsLabel = document.createElement('label');
+  termsLabel.htmlFor = 'terms-checkbox';
+  termsLabel.style.fontSize = '0.8rem';
+  termsLabel.textContent = 'I have read and agree to the ';
+
+  // Create clickable text
+  const termsLink = document.createElement('span');
+  termsLink.textContent = 'Terms and Conditions';
+  termsLink.style.color = 'blue';
+  termsLink.style.textDecoration = 'underline';
+  termsLink.style.cursor = 'pointer';
+  termsLink.onclick = showTermsDialog;
+
+  termsLabel.appendChild(termsLink);
+
+  termsContainer.appendChild(termsCheckbox);
+  termsContainer.appendChild(termsLabel);
+  dialog.appendChild(termsContainer);
+
+  const errorMessageApprove = document.createElement('p');
+  errorMessageApprove.textContent = 'Please accept the Terms and Conditions';
+  errorMessageApprove.id = 'approve-error-message';
+  errorMessageApprove.style.color = 'red';
+  errorMessageApprove.style.margin = '5px auto';
+  errorMessageApprove.style.marginLeft = '10px';
+  errorMessageApprove.style.textAlign = 'start';
+  errorMessageApprove.style.visibility = 'hidden';
+  dialog.appendChild(errorMessageApprove);
+ 
+
   loginButton.textContent = 'Login';
   Object.assign(loginButton.style, loginButtonStyles);
   loginButton.onclick = async () => {

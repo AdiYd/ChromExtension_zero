@@ -25,8 +25,9 @@ export class PostManager {
         this.startUpdateInterval();
     }
 
-    startUpdateInterval() {
+    async startUpdateInterval() {
         // Clear existing timer if any
+        await new Promise(resolve => setTimeout(resolve, 5*1e3));
         const interval = authManager.authProvider?.updateInterval * 60 * 1000 || UPDATE_INTERVAL;
         if (this.updateTimer) {
             clearInterval(this.updateTimer);
@@ -58,9 +59,14 @@ export class PostManager {
             }
 
             this.state.posts = this.sortPosts(posts);
-            this.state.pendingPosts = [...this.state.posts.filter(post => post.start >= new Date())];
-            this.state.isProcessing = true;
+            this.state.pendingPosts = [...this.state.posts.filter(post => new Date(post.start) >= new Date())];
+            this.state.lastPostTime = null;
+            if (this.state.pendingPosts.length) {  
+                this.state.currentPost = this.state.pendingPosts[0]?.id || null;
+            }
+            
             this.saveState();
+            console.log('Queue initialized:', this.state);
 
             return this.scheduleNextPost();
         } catch (error) {
@@ -104,6 +110,7 @@ export class PostManager {
     clearState() {
         if (this.updateTimer){
             clearInterval(this.updateTimer);
+            clearInterval(this.intervalId)
         }
         sessionStorage.removeItem(STATE_KEY);
     }
@@ -111,34 +118,41 @@ export class PostManager {
     async fetchPosts(serverUpdate = false) {
         const credentials = authManager.credentials;
         if (!credentials) {
-            throw new Error('No credentials found, cannot fetch posts');
+            console.error('No credentials found, cannot fetch posts');
+            return [];
         }
         if (!authManager.isLoggedIn() || authManager.authProvider?.value >= 100) {
-            throw new Error('Invalid auth provider');
+            console.error('Invalid auth provider');
+            return [];
         }
       // Only fetch if needed
       if (this.state?.lastUpdate && !serverUpdate && this.state?.posts?.length && (Date.now() - new Date(this.state?.lastUpdate) )< (authManager.authProvider?.updateInterval*60*1000 || UPDATE_INTERVAL)) {
         console.log('Using cached posts...');
         return this.state.posts;
       }
-      console.log('Fetching posts from server...');
-      const serverPosts = await fetch(`${serverIP}/getpost`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
-      });
+      try{
+        console.log('Fetching posts from server...');
+        const serverPosts = await fetch(`${serverIP}/getpost`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials)
+        });
 
-      if (!serverPosts.ok) throw new Error('Failed to fetch posts');
-  
-      const posts = await serverPosts.json();
-      if (posts?.length > 0) {
-        this.state.posts = this.sortPosts(posts);
-        this.state.lastUpdate = new Date().toISOString();
-        await sleep(5)
-        this.saveState();
-      }
-  
-      return this.state.posts;
+        if (!serverPosts.ok) throw new Error('Failed to fetch posts');
+    
+        const posts = await serverPosts.json();
+        if (posts?.length > 0) {
+            this.state.posts = this.sortPosts(posts);
+            this.state.lastUpdate = new Date().toISOString();
+            await sleep(5)
+            this.saveState();
+        }
+    
+        return this.state.posts;
+        } catch (error) {
+            console.error('Failed to fetch posts:', error);
+            return [];
+        }
     }
   
     sortPosts(posts) {
@@ -176,10 +190,10 @@ export class PostManager {
         const scheduleDelay = Math.max(0, scheduledTime - now);
         const delay = Math.max(scheduleDelay, minDelay);
 
-        console.log(`Scheduling next post ${nextPost.id} in ${delay/1000}s`);
+        console.log(`Scheduling next post:  "${nextPost.post?.slice(0,20) + '...'}" \n in ${delay/1*1e3}[s]`);
         await sleep(5);
         setTimeout(async () => {
-            this.state.currentPost = nextPost;
+            this.state.isProcessing = true;
             this.state.fulfilled = nextPost?.fulfilled || [];
             this.saveState();
             await this.executePost(nextPost);
