@@ -194,7 +194,7 @@ export class PostManager {
         await sleep(5);
         setTimeout(async () => {
             this.state.isProcessing = true;
-            this.state.fulfilled = nextPost?.fulfilled || [];
+            this.state.fulfilled = ((nextPost?.amount && nextPost?.amount === 1 )||(!nextPost.amount)) ? (nextPost?.fulfilled || []) : [];
             this.saveState();
             await this.executePost(nextPost);
         }, delay);

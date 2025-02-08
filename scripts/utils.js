@@ -4,7 +4,7 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { authManager } from './authManager';
 import { postManager } from './postManager';
 
-export const production =false // process.env.NODE_ENV === 'production';
+export const production = process.env.NODE_ENV === 'production';
 export const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
 export const config = {
@@ -70,12 +70,12 @@ export const createBanner = async ()=>{
       zIndex: '1001',
       display: 'flex',
       justifyContent: 'space-between',
-      backgroundImage: 'linear-gradient(45deg, #2c3e50, #4ca1af)',
+      backgroundImage: 'linear-gradient(135deg, #2c3e50, #4ca1af)',
       color: 'white',
       border: '1px solid gray',
       boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
       borderRadius: '12px',
-      width: 'fit-content',
+      width: 'fill-available',
       alignItems: 'center',
       direction: 'rtl',
     };
@@ -130,7 +130,7 @@ export const createBanner = async ()=>{
     // bannerLogo.style.marginLeft = '10px';
   
     const bannerText = document.createElement('span');
-    bannerText.textContent = 'Postomatics running...';
+    bannerText.textContent = 'מחכה לפוסטים מתוזמנים...';
   
     notificationBanner.appendChild(bannerLogo);
     // notificationBanner.appendChild(bannerText);
@@ -185,8 +185,10 @@ export const createBanner = async ()=>{
 
 
     stateInfo.innerHTML = `
-        ${nextPostText ? `<div><b>הפוסט הבא: </b> ${nextPostText}</div>` : ''}
-        ${nextTime ? `<div><b>מתוזמן ל: </b> ${nextTime}</div>` : ''}
+        ${nextPostText ? `<div><b>הפוסט שרץ: </b> ${nextPostText}</div>` : ''}
+        ${state.nextGroup ? `<div><b>קבוצה הבאה: </b> ${state.nextGroup}</div>` : ''}
+        ${state.lastSuccessfulGroup ? `<div><b>קבוצה אחרונה: </b> ${state.lastSuccessfulGroup}</div>` : ''}
+        ${state.totalFullfilled ? `<div><b>כמות הקבוצות שהושלמו: </b> ${state.totalFullfilled}</div>` : ''}
         ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
         ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
     `;
@@ -196,10 +198,10 @@ export const createBanner = async ()=>{
     const newPostButtonStyle = {
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'end', 
+      justifyContent: 'center', 
       cursor: 'pointer',
       padding: '8px 12px',
-      margin: 'auto',
+      flex: '0 0 auto',
       width: 'fit-content',
       borderRadius: '8px',
       marginRight: '15px',
@@ -294,7 +296,7 @@ export const setFulfilled = async (postId, groupId) => {
             console.log('Fulfill response:', data);
             return false;
         }
-       
+        
         return true;
     } catch (error) {
         console.error('Error setting fulfill:', error);

@@ -1,9 +1,7 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
 import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping } from './utils';
-// import puppeteer from 'puppeteer-extra';
-// import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-// puppeteer.use(StealthPlugin());
+
 
 // console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
 
@@ -602,6 +600,7 @@ export const postIntoInput = async (post) => {
   const inputSelectors = [
     "div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
+    "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='יצירת פוסט ציבורי...'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0']"
   ];
 
@@ -836,10 +835,22 @@ async function clickPostButton(postDialog) {
   // סלקטורים אפשריים
   const postButtonSelectors = [
     "div[aria-label='Post'][role='button']",
+    "div[aria-label='פרסום'][role='button']", // Hebrew Post button
+    "div[aria-label='פרסם'][role='button']", // Hebrew Post button
+    "div[aria-label='פרסמי'][role='button']", // Hebrew Post button
     "div[role='button']:has(span:contains('Post'))",
+    "div[role='button']:has(span:contains('פרסום'))", // Hebrew Post text
+    "div[role='button']:has(span:contains('פרסם'))", // Hebrew Post text
+    "div[role='button']:has(span:contains('פרסמי'))", // Hebrew Post text
     "div[role='button'] span:contains('Post')",
+    "div[role='button'] span:contains('פרסום')", // Hebrew Post span
+    "div[role='button'] span:contains('פרסם')", // Hebrew Post span
+    "div[role='button'] span:contains('פרסמי')", // Hebrew Post span
     "div.x1i10hfl[role='button']",
-    "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')"
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')",
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסום')", // Hebrew Post span with class
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסם')", // Hebrew Post span with class
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסמי')" // Hebrew Post span with class
   ];
 
   let finalPostButton = null;
@@ -862,6 +873,9 @@ async function clickPostButton(postDialog) {
   console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
   if (authManager.authProvider?.click) {
     finalPostButton.click();
+  }
+  else {
+    console.log('Click event is blocked');
   }
   await sleep(10);
 
@@ -955,10 +969,16 @@ export const postToFacebook = async (post) => {
           }
           else {
             // Update success state
-            state.fulfilled.push(post.groups[i].id);
+           
             if (!post.repeat || post.repeat === 1) {
-              await setFulfilled(post.id, post.groups[i]?.id);
+              const response = await setFulfilled(post.id, post.groups[i]?.id);
+              if (response){
+                state.fulfilled.push(post.groups[i].id);
+              }
             }
+            state.lastSuccessfulGroup = post.groups[i] ?  post.groups[i].groupName : null;
+            state.nextGroup = post.groups[i+1] ?  post.groups[i + 1]?.groupName : null;
+            state.totalFullfilled = `${state.fulfilled.length} / ${post.groups.length}`;
             state.groupIndex = i + 1;
             state.lastPostTime = new Date().toISOString();
             postManager.saveState();
