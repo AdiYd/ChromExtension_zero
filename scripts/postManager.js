@@ -27,7 +27,7 @@ export class PostManager {
 
     async startUpdateInterval() {
         // Clear existing timer if any
-        await new Promise(resolve => setTimeout(resolve, 5*1e3));
+        await new Promise(resolve => setTimeout(resolve, 1*1e3));
         const interval = authManager.authProvider?.updateInterval * 60 * 1000 || UPDATE_INTERVAL;
         if (this.updateTimer) {
             clearInterval(this.updateTimer);
@@ -47,7 +47,7 @@ export class PostManager {
     async initialize() {
         if (this.state.isProcessing) {
             console.log('Resuming existing queue...');
-            return this.resumeQueue();
+            return await this.resumeQueue();
         }
         
         try {
@@ -168,16 +168,19 @@ export class PostManager {
         if (!currentPost) {
             return this.scheduleNextPost();
         }
-        return this.executePost(currentPost);
+        return await this.executePost(currentPost);
     }
 
     async scheduleNextPost() {
         if (!this.state?.pendingPosts?.length) {
-            console.log('Queue completed');
+            console.log('Completed posts!');
             this.clearState();
             return true;
         }
-
+        if (!this.state?.pendingPosts?.length) {
+            window.location.reload();
+            return false;
+        }
         const nextPost = this.state?.pendingPosts[0];
         const scheduledTime = new Date(nextPost.start);
         await sleep(5);
@@ -212,7 +215,7 @@ export class PostManager {
                 this.state.currentPost = null;
                 this.saveState();
                 
-                return this.scheduleNextPost();
+                return await this.scheduleNextPost();
             }
             
             return false;

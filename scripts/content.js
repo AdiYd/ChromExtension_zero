@@ -1,6 +1,6 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
-import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping } from './utils';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP } from './utils';
 
 
 // console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
@@ -538,7 +538,7 @@ const startApp = async () => {
     color: 'gray',
   };
   Object.assign(poweredByText.style, poweredByTextStyles);
-  poweredByText.innerHTML = 'Powered by <a href="https://Taskomatic.net" target="_blank" style="color: blue; text-decoration: underline;">Taskomatic.net</a>';
+  poweredByText.innerHTML = 'Powered by <a href="https://Taskomatic.net" target="_blank" style="color: blue; text-decoration: underline;">Taskomatic.net</a> (V3.0)';
   dialog.appendChild(poweredByText);
 
 
@@ -576,12 +576,33 @@ export const postIntoInput = async (post) => {
   writeButton.click();
   await sleep(3);
 
-  // 3) מאתרים את הדיאלוג "Create post"
-  //    (ייתכן שבעברית aria-label="צור פוסט", צריך לבדוק)
-  const postDialogChild = await waitForElement("div[role='dialog'][aria-label='Create post']", 10000);
+
+  const postDialogSelectors = [
+    "div[role='dialog'][aria-label='Create post']",
+    "div[role='dialog'][aria-label='Create Post']",
+    "div[role='dialog'][aria-label='יצירת פוסט']", // Hebrew - Create post
+    "div[role='dialog'][aria-label='צור פוסט']", // Hebrew - Create post
+    "div[role='dialog'][aria-label='צרי פוסט']", // Hebrew - Create post
+    "div[role='dialog'][aria-label='Create a post']",
+    "div[role='dialog'][aria-label='Create a Post']",
+    "div[role='dialog'][aria-label='New post']",
+    "div[role='dialog'][aria-label='New Post']",
+    "div[role='dialog'][aria-label='פוסט חדש']", // Hebrew - New post
+    "div[role='dialog'][aria-label='כתיבת פוסט']", // Hebrew - Write post
+    "div[role='dialog'][aria-label='פרסום פוסט']", // Hebrew - Publish post
+    "div[role='dialog'][aria-label='העלאת פוסט']", // Hebrew - Upload post
+    "div[role='dialog']", // Generic fallback as last resort
+  ];
+
+  let postDialogChild = null;
+  for (const selector of postDialogSelectors) {
+    postDialogChild = await waitForElement(selector, 2*1e3);
+    if (postDialogChild) break;
+  }
+
   if (!postDialogChild) {
-    console.error('לא נמצא דיאלוג עם aria-label="Create post"');
-    await sleep(2);
+    console.error('לא נמצא דיאלוג Create post לפי הסלקטורים הקיימים');
+    await sleep(2); 
     return false;
   }
   // לפעמים postDialogChild הוא ממש ה-div, לפעמים צריך parentElement.parentElement
@@ -601,6 +622,7 @@ export const postIntoInput = async (post) => {
     "div[role='textbox'][contenteditable='true'][tabindex='0'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='יצירת פוסט ציבורי...'][data-lexical-editor='true']",
+    "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='יצירת פוסט ציבורי…'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0']"
   ];
 
@@ -620,7 +642,7 @@ export const postIntoInput = async (post) => {
 
   console.log('Post input:', postInput);
   postInput.focus();
-  const postText = (post.post || '').replace(/\s+/g, ' ').trim();
+  const postText = post.post?.trim() || '';
   console.log('מנסה להזין טקסט:', postText);
   await sleep(1);
 
@@ -653,9 +675,6 @@ export const postIntoInput = async (post) => {
     console.error('לא נמצא כפתור Post או לא הצליח ללחוץ');
     return false;
   }
-  const postDelay = authManager.authProvider?.postDelay || (Math.random() * 3.5 + 1.5);
-  await sleep(postDelay * 60 * 1000);
-
   return true;
 };
 
@@ -871,7 +890,7 @@ async function clickPostButton(postDialog) {
   }
 
   console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
-  if (authManager.authProvider?.click) {
+  if (authManager.authProvider?.click && (production !== false)) {
     finalPostButton.click();
   }
   else {
@@ -896,9 +915,9 @@ export const postToGroup = async (post) => {
       group.groupId = group.groupId || group.groupid;
 
       // Check if already posted
-      if (state.fulfilled.includes(group.id)) {
+      if (state.fulfilled.includes(group.id) && (post.amount === getNumberOfItemsFilter(group.id, state.fulfilled))) {
           console.log(`Already posted in group ${group.id}`);
-          return {status: true, message: 'Already posted'};
+          return {status: true, message: 'Already posted', posted: true};
       }
 
       // Validate group data
@@ -929,7 +948,6 @@ export const postToGroup = async (post) => {
       // Reset retry counter on success
       state.retryCount = 0;
       postManager.saveState();
-      
       return {status: true, message: 'Post successful'};
   } catch (error) {
       console.error(`Error in group ${group.groupName}:`, error);
@@ -939,6 +957,7 @@ export const postToGroup = async (post) => {
 
 export const postToFacebook = async (post) => {
   const state = postManager.state;
+  console.log('Post to Facebook:', post, postManager.state);
 
   try {
       if (!authManager.credentials || !authManager.isLoggedIn()) {
@@ -952,8 +971,11 @@ export const postToFacebook = async (post) => {
       for (let i = state.groupIndex; i < post.groups.length; i++) {
           // Update current execution state
           state.currentPost = post.id;
+          state.nextGroup = post.groups[i]?.groupName;
+          state.totalFullfilled = `${state.fulfilled.length} / ${post.groups.length}`;
           state.groupIndex = i;
           postManager.saveState();
+          console.log('Posting in group:', post.groups[i].groupName); 
 
           const isPosted = await postToGroup(post);
           if (!isPosted.status) {
@@ -964,24 +986,31 @@ export const postToFacebook = async (post) => {
                   time: new Date().toISOString()
               });
               state.groupIndex = i + 1;
+              state.nextGroup = post.groups[i + 1]?.groupName;
+              state.totalFullfilled = `${state.fulfilled.length} / ${post.groups.length}`;
               postManager.saveState();
               continue;
           }
           else {
             // Update success state
-           
-            if (!post.repeat || post.repeat === 1) {
+            if (!isPosted.posted) {
               const response = await setFulfilled(post.id, post.groups[i]?.id);
               if (response){
                 state.fulfilled.push(post.groups[i].id);
               }
             }
+            
             state.lastSuccessfulGroup = post.groups[i] ?  post.groups[i].groupName : null;
             state.nextGroup = post.groups[i+1] ?  post.groups[i + 1]?.groupName : null;
             state.totalFullfilled = `${state.fulfilled.length} / ${post.groups.length}`;
             state.groupIndex = i + 1;
             state.lastPostTime = new Date().toISOString();
             postManager.saveState();
+            if (!(i === post.groups.length - 1)) {
+              const postDelay = authManager.authProvider?.postDelay || (Math.random() * 3.5 + 1.5);
+              state.postDelay = postDelay;
+              await sleep(postDelay * 60);
+            }
           }
       }
 
@@ -1020,6 +1049,26 @@ async function initializePostomatic() {
   // Check if already logged in
   if (authManager.isLoggedIn()) {
     console.log(`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+      if (window.location.href.includes('https://www.facebook.com/groups/joins/')) {
+        console.log('%c +++ Collecting groups data +++ ', 'font-weight: bold; color: #4CAF50; font-size: 16px');
+        const groups = await collectGroups();
+        console.log('Collected groups:', groups);
+        try {
+          const setGroupsToServer = await fetch(`${serverIP}/setgroups`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({...authManager.credentials, data: groups})
+                });
+          if (setGroupsToServer.ok) {
+            console.log('Groups data sent to server');
+          }
+        } catch (error) {
+          console.error('Error sending groups data to server:', error);
+          window.location.href = 'https://www.facebook.com/';
+        }
+        await sleep(8);
+        window.location.href = 'https://www.facebook.com/';
+      }
       postManager.initialize();
       await createBanner();
       return;
@@ -1033,6 +1082,7 @@ async function initializePostomatic() {
     console.log('%c *** Go to home page to login to postomatic *** ', 'background: linear-gradient(to right, #ffd700, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
     console.log('https://www.facebook.com/');
   }
+
 
 }
 
