@@ -1,13 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Postomatics Extension",
-  "version": "3.0",
+  "version": "3.2",
+  "production": false,
   "description": "This extension will help you to schedule posts on facebook",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["scripts/*", "icons/icon.png"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "scripts/*",
+        "icons/icon.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {
@@ -17,8 +26,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/*"],
-      "js": ["dist/bundle.js"]
+      "matches": [
+        "https://www.facebook.com/*"
+      ],
+      "js": [
+        "dist/bundle.js"
+      ]
     }
   ]
 }

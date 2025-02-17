@@ -4,7 +4,8 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { authManager } from './authManager';
 import { postManager } from './postManager';
 
-export const production = false //process.env.NODE_ENV === 'production';
+export const production = chrome.runtime.getManifest().production;
+console.log('Production:', production); 
 export const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
 export const config = {

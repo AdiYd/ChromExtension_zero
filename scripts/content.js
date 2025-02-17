@@ -538,7 +538,7 @@ const startApp = async () => {
     color: 'gray',
   };
   Object.assign(poweredByText.style, poweredByTextStyles);
-  poweredByText.innerHTML = 'Powered by <a href="https://Taskomatic.net" target="_blank" style="color: blue; text-decoration: underline;">Taskomatic.net</a> (V3.0)';
+  poweredByText.innerHTML = `Powered by <a href="https://Taskomatic.net" target="_blank" style="color: blue; text-decoration: underline;">Taskomatic.net</a> (V${chrome.runtime.getManifest().version})`;
   dialog.appendChild(poweredByText);
 
 
