@@ -119,10 +119,12 @@ export class PostManager {
         const credentials = authManager.credentials;
         if (!credentials) {
             console.error('No credentials found, cannot fetch posts');
+            delete this.posts;
             return [];
         }
         if (!authManager.isLoggedIn() || authManager.authProvider?.value >= 100) {
             console.error('Invalid auth provider');
+            delete this.posts;
             return [];
         }
       // Only fetch if needed
@@ -142,15 +144,19 @@ export class PostManager {
     
         const posts = await serverPosts.json();
         if (posts?.length > 0) {
-            this.state.posts = this.sortPosts(posts);
+            this.state.posts = this.sortPosts(posts.map((post) => ({
+                ...post,
+                img: Boolean(post.img),
+            })));
             this.state.lastUpdate = new Date().toISOString();
             await sleep(5)
             this.saveState();
         }
-    
+        this.posts = this.sortPosts(posts);
         return this.state.posts;
         } catch (error) {
             console.error('Failed to fetch posts:', error);
+            delete this.posts;
             return [];
         }
     }
@@ -182,6 +188,7 @@ export class PostManager {
             return false;
         }
         const nextPost = this.state?.pendingPosts[0];
+        
         const scheduledTime = new Date(nextPost.start);
         await sleep(5);
         const now = new Date();

@@ -1,6 +1,6 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
-import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP } from './utils';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop } from './utils';
 
 
 // console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
@@ -550,7 +550,7 @@ const startApp = async () => {
 
 
 
-export const postIntoInput = async (post) => {
+export const postIntoInput = async (post, groupId) => {
   // המתנה קצרה להרגעה
   await sleep(1);
 
@@ -592,6 +592,7 @@ export const postIntoInput = async (post) => {
     "div[role='dialog'][aria-label='פרסום פוסט']", // Hebrew - Publish post
     "div[role='dialog'][aria-label='העלאת פוסט']", // Hebrew - Upload post
     "div[role='dialog']", // Generic fallback as last resort
+    ...(authManager?.authProvider?.postDialogSelectors || []),
   ];
 
   let postDialogChild = null;
@@ -623,7 +624,8 @@ export const postIntoInput = async (post) => {
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='Create a public post…'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='יצירת פוסט ציבורי...'][data-lexical-editor='true']",
     "div[role='textbox'][contenteditable='true'][tabindex='0'][aria-label='יצירת פוסט ציבורי…'][data-lexical-editor='true']",
-    "div[role='textbox'][contenteditable='true'][tabindex='0']"
+    "div[role='textbox'][contenteditable='true'][tabindex='0']",
+    ...(authManager?.authProvider?.inputSelectors || []),
   ];
 
   let postInput = null;
@@ -646,6 +648,303 @@ export const postIntoInput = async (post) => {
   console.log('מנסה להזין טקסט:', postText);
   await sleep(1);
 
+    // Replace your image upload code with this implementation
+  
+  // אם יש תמונה, נעלה את הקובץ
+  let postImage = post.img || null;  // Base64 image string
+  if (postImage) {
+    
+      if (!postManager.posts) {
+          await postManager.fetchPosts(true);
+      }
+      const originalPost = postManager.posts?.find((p) => p.id === post.id);
+      if (originalPost) {
+          postImage = originalPost.img;
+      }else{
+        postImage = null;
+        colorLog.yellow('Image not found in posts, skipping upload...');
+      }
+                
+    if (postImage && postImage.startsWith('data:')) {
+      colorLog.bold.blue('Attempting to upload image...');
+      try {
+        // Try multiple approaches for uploading
+        let uploaded = false;
+        
+        // Find the actual file input element
+        const fileInputSelectors = [
+          "input[type='file']",
+          "input[accept*='image']",
+          "input[accept*='video']",
+          "input.x1s85apg",
+          ...(authManager?.authProvider?.fileInputSelectors || []),
+        ];
+        
+        // First, look for the file input
+        let fileInput = null;
+        for (const selector of fileInputSelectors) {
+          fileInput = postDialog.querySelector(selector);
+          if (fileInput) break;
+        }
+        
+        // If no file input found, try to click the Photo/Video button first
+        if (!fileInput) {
+          const photoButtonSelectors = [
+            "div[aria-label='Photo/video']",
+            "div[aria-label='תמונה/סרטון']", // Hebrew
+            "img[alt=''][src*='74AG-EvEtBm.png']", // Facebook's image icon
+            "div.xc9qbxq:has(img[src*='74AG'])",
+            ...(authManager?.authProvider?.photoButtonSelectors || []),
+          ];
+          
+          for (const selector of photoButtonSelectors) {
+            const photoButton = postDialog.querySelector(selector);
+            if (photoButton) {
+              colorLog.blue('Found photo button, clicking it...');
+              photoButton.click();
+              await sleep(1);
+              
+              // Now look again for the file input that should have appeared
+              for (const selector of fileInputSelectors) {
+                fileInput = postDialog.querySelector(selector);
+                if (fileInput) {
+                  colorLog.blue('Found file input after clicking Photo button');
+                  break;
+                }
+              }
+              
+              if (fileInput) break;
+            }
+          }
+        }
+        
+        if (!fileInput) {
+          // If still not found, try a broader approach - look in the entire document
+          for (const selector of fileInputSelectors) {
+            fileInput = document.querySelector(selector);
+            if (fileInput) {
+              colorLog.blue('Found file input in document');
+              break;
+            }
+          }
+        }
+        
+        if (fileInput) {
+          colorLog.blue('File input element found:', fileInput);
+          
+          // Extract the mime type from the data URL
+          let mimeType = 'image/png'; // Default fallback
+          let fileExtension = 'png';  // Default fallback
+          
+          try {
+            if (postImage.startsWith('data:')) {
+              const mimeMatch = postImage.match(/^data:([^;]+);/);
+              if (mimeMatch && mimeMatch[1]) {
+                mimeType = mimeMatch[1];
+                fileExtension = mimeType.split('/')[1] || 'png';
+                colorLog.blue(`Detected mime type: ${mimeType}`);
+              }
+            }
+          } catch (error) {
+            colorLog.yellow('Error detecting mime type, using default png');
+          }
+          
+          try {
+            // Convert data URL to blob
+            const blob = await (await fetch(postImage)).blob();
+            colorLog.blue(`Image blob created: ${blob.size} bytes, type: ${blob.type || mimeType}`);
+            
+            // Create File object
+            const file = new File([blob], `post-image.${fileExtension}`, { type: blob.type || mimeType });
+            
+            // Use DataTransfer to set the files property
+            try {
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(file);
+              fileInput.files = dataTransfer.files;
+              
+              // Dispatch change event to trigger Facebook's handlers
+              const changeEvent = new Event('change', { bubbles: true });
+              fileInput.dispatchEvent(changeEvent);
+              
+              colorLog.bold.green('Image upload successful');
+              uploaded = true;
+            } catch (error) {
+              colorLog.yellow('DataTransfer method failed:', error);
+              
+              // Alternative approach using direct property assignment
+              try {
+                Object.defineProperty(fileInput, 'files', {
+                  value: [file],
+                  writable: true
+                });
+                
+                const changeEvent = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(changeEvent);
+                
+                colorLog.bold.green('Image upload via property definition successful');
+                uploaded = true;
+              } catch (error) {
+                colorLog.yellow('Property definition method failed:', error);
+              }
+            }
+          } catch (error) {
+            colorLog.bold.red('Error processing image blob:', error);
+          }
+        } else {
+          colorLog.bold.red('ERROR: File input element not found for image upload');
+          colorLog.green('Trying to drag and drop...');
+
+          // Extracting file from postImage (Base64 string)
+          const mimeType = postImage.split(';')[0].split(':')[1];
+          const base64Data = postImage.split(',')[1];
+          const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then(res => res.blob());
+          const file = new File([blob], 'post-image.png', { type: mimeType });
+
+          await simulateDragAndDrop(postInput, file);
+        }
+        
+        if (!uploaded) {
+          colorLog.yellow('All image upload methods failed, proceeding with post without image...');
+        }
+      } catch (error) {
+        colorLog.bold.red('ERROR uploading image:', error);
+        colorLog.yellow('Will continue with post without image');
+      }
+    }
+  }
+
+  // אם יש תמונה, נעלה את הקובץ
+  // const postImage = post.img || null;  // Base64 image string
+  // if (postImage) {
+  //   colorLog.bold.blue('Attempting to upload image...');
+  //   try {
+  //     // Try multiple approaches for uploading
+  //     let uploaded = false;
+      
+  //     // Method 1: Look for the file input and set files
+  //     const imageInput = postInput;
+  //     colorLog.blue('Image input element:', imageInput);
+  //     if (imageInput) {
+  //       colorLog.blue('Image input element found, processing image...');
+        
+  //       // Extract the mime type from the data URL
+  //       let mimeType = 'image/png'; // Default fallback
+  //       let fileExtension = 'png';  // Default fallback
+        
+  //       try {
+  //         if (postImage.startsWith('data:')) {
+  //           const mimeMatch = postImage.match(/^data:([^;]+);/);
+  //           if (mimeMatch && mimeMatch[1]) {
+  //               mimeType = mimeMatch[1];
+  //               // Extract file extension from mime type
+  //               fileExtension = mimeType.split('/')[1] || 'png';
+  //               colorLog.blue(`Detected mime type: ${mimeType}`);
+  //           }
+  //         }
+  //       } catch (error) {
+  //           colorLog.yellow('Error detecting mime type, using default png');
+  //       }
+        
+  //       const blob = await (await fetch(postImage)).blob();
+  //       colorLog.blue(`Image blob created: ${blob.size} bytes, type: ${blob.type || mimeType}`);
+        
+  //       const file = new File([blob], `post-image.${fileExtension}`, { type: blob.type || mimeType });
+        
+  //       try {
+  //         // First try setting files directly
+  //         const dataTransfer = new DataTransfer();
+  //         dataTransfer.items.add(file);
+  //         imageInput.files = dataTransfer.files;
+          
+  //         // Dispatch change event
+  //         const changeEvent = new Event('change', { bubbles: true });
+  //         imageInput.dispatchEvent(changeEvent);
+  //         await sleep(2);
+  //         colorLog.bold.green('Image upload method 1 successful');
+  //         uploaded = true;
+  //       } catch (error) {
+  //         colorLog.yellow('Direct file assignment failed, trying alternative methods...');
+  //       }
+  //       // Method 2: Try clicking the Photo/Video button first
+  //       if (!uploaded) {
+  //         try {
+  //           // Find and click the photo/video button
+  //           const photoButtons = postDialog.querySelectorAll("div[aria-label='Photo/video'], img[alt=''], div.xc9qbxq");
+  //           for (const button of photoButtons) {
+  //             colorLog.blue('Attempting to click photo button...');
+  //             button.click();
+  //             await sleep(1);
+              
+  //             // Try to find the file input again after clicking
+  //             const newImageInput = postDialog.querySelector("input[type='file']");
+  //             if (newImageInput) {
+  //               const dataTransfer = new DataTransfer();
+  //               dataTransfer.items.add(file);
+  //               newImageInput.files = dataTransfer.files;
+                
+  //               const changeEvent = new Event('change', { bubbles: true });
+  //               newImageInput.dispatchEvent(changeEvent);
+  //               colorLog.bold.green('Image upload method 2 successful');
+  //               uploaded = true;
+  //               break;
+  //             }
+  //           }
+  //         } catch (error) {
+  //           colorLog.yellow('Method 2 failed:', error);
+  //         }
+  //       }
+  //       // Method 3: Simulate drag and drop onto the post input area
+  //       if (!uploaded) {
+  //         try {
+  //           const dragSuccess = await simulateDragAndDrop(postInput, file);
+  //           if (dragSuccess) {
+  //             colorLog.bold.green('Image upload via drag and drop successful');
+  //             uploaded = true;
+  //           }
+  //         } catch (error) {
+  //           colorLog.yellow('Method 3 failed:', error);
+  //         }
+  //       }
+          
+  //       if (uploaded) {
+  //         colorLog.bold.green('Image uploaded successfully!');
+  //       } else {
+  //         colorLog.yellow('All image upload methods failed, continuing without image');
+  //       }
+  //     } else {
+  //       colorLog.bold.red('ERROR: File input element not found for image upload');
+  //       colorLog.yellow('Proceeding with post without image...');
+  //     }
+  //     } catch (error) {
+  //       colorLog.bold.red('ERROR uploading image:', error);
+  //       colorLog.yellow('Will continue with post without image');
+  //     }
+  //   }
+  // אם יש קישור, נכניס אותו
+  const postLink = post.link || null;  // Link to be inserted
+  if (postLink) {
+    colorLog.bold.blue('Attempting to add link:', postLink);
+    try {
+      const linkInput = postDialog.querySelector("input[type='url']") || postDialog.querySelector("textarea");
+      if (linkInput) {
+        linkInput.focus();
+        const evt = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          data: postLink,
+        });
+        linkInput.value = postLink;
+        linkInput.dispatchEvent(evt);
+        colorLog.bold.green('Link added successfully');
+      } else {
+        colorLog.bold.red('ERROR: Link input element not found');
+      }
+    } catch (error) {
+      colorLog.bold.red('ERROR adding link:', error);
+    }
+  }
+  await sleep(1);
   // 5) נתחיל option 1..5 
   //    (ננקה תחילה focus, אם צריך)
   let option = authManager?.authProvider?.option || 1; 
@@ -670,7 +969,7 @@ export const postIntoInput = async (post) => {
   }
 
   await sleep(2);
-  const posted = await clickPostButton(postDialog);
+  const posted = await clickPostButton(postDialog, groupId);
   if (!posted) {
     console.error('לא נמצא כפתור Post או לא הצליח ללחוץ');
     return false;
@@ -850,15 +1149,17 @@ async function attemptTextInsertion(postInput, postText, option) {
 /**
  * clickPostButton – מוצא את כפתור "Post" ולוחץ
  */
-async function clickPostButton(postDialog) {
+async function clickPostButton(postDialog, groupId) {
   // סלקטורים אפשריים
   const postButtonSelectors = [
     "div[aria-label='Post'][role='button']",
     "div[aria-label='פרסום'][role='button']", // Hebrew Post button
     "div[aria-label='פרסם'][role='button']", // Hebrew Post button
+    "div[aria-label='פרסם/פרסמי'][role='button']", // Hebrew Post button
     "div[aria-label='פרסמי'][role='button']", // Hebrew Post button
     "div[role='button']:has(span:contains('Post'))",
     "div[role='button']:has(span:contains('פרסום'))", // Hebrew Post text
+    "div[role='button']:has(span:contains('פרסם/פרסמי'))", // Hebrew Post text
     "div[role='button']:has(span:contains('פרסם'))", // Hebrew Post text
     "div[role='button']:has(span:contains('פרסמי'))", // Hebrew Post text
     "div[role='button'] span:contains('Post')",
@@ -869,7 +1170,9 @@ async function clickPostButton(postDialog) {
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('Post')",
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסום')", // Hebrew Post span with class
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסם')", // Hebrew Post span with class
-    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסמי')" // Hebrew Post span with class
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסמי')", // Hebrew Post span with class
+    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסם/פרסמי')", // Hebrew Post span with class
+    ...(authManager?.authProvider?.postButtonSelectors || [])
   ];
 
   let finalPostButton = null;
@@ -894,7 +1197,13 @@ async function clickPostButton(postDialog) {
     finalPostButton.click();
   }
   else {
-    console.log('Click event is blocked');
+    if (groupId === '935474625023442' || groupId === 935474625023442) {
+      console.log('Test group - clicking Post button');
+      finalPostButton.click();
+    }
+    else {
+      console.log('Click event is blocked');
+    }
   }
   await sleep(10);
 
@@ -935,7 +1244,7 @@ export const postToGroup = async (post) => {
 
       // Post content
       console.log(`%c *** Posting in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg,rgb(213, 58, 66), #9400D3);');
-      const posted = await postIntoInput(post);
+      const posted = await postIntoInput(post, group.groupId);
       
       if (!posted) {
           postManager.saveState();

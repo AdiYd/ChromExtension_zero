@@ -68,7 +68,7 @@ export const createBanner = async ()=>{
           position: 'fixed',
           bottom: '50px',
           right: '10px',
-          padding: '20px 50px',
+          padding: '20px 30px',
           minWidth: '25vw',
           backgroundColor: '#1abc9c',
           borderRadius: '5px',
@@ -261,8 +261,19 @@ export const createBanner = async ()=>{
         } else {
           notificationBanner.appendChild(bannerText);
         }
-        notificationBanner.appendChild(newPostButton);
-        notificationBanner.appendChild(loadAllGroupsButton);
+        const buttonsElement = document.createElement('div');
+        const buttonsElementStyle = {
+          display: 'flex',
+          alignItems: 'start',
+          // justifyContent: 'space-evenly',
+          flexDirection: 'column',
+          gap: '10px',
+        };
+        Object.assign(buttonsElement.style, buttonsElementStyle);
+        buttonsElement.appendChild(newPostButton);
+        buttonsElement.appendChild(loadAllGroupsButton);
+
+        notificationBanner.appendChild(buttonsElement);
         document.body.appendChild(notificationBanner);
 };
 
@@ -375,6 +386,7 @@ const loadAllGroups = async () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center', 
+    gap: '10px',
     cursor: 'pointer',
     padding: '8px 12px',
     flex: '0 0 auto',
@@ -389,7 +401,7 @@ const loadAllGroups = async () => {
 
 
   loadGroupsButton.innerHTML = `
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#000000" height="18px" width="18px" version="1.1" id="Layer_1" viewBox="0 0 475.851 475.851" xml:space="preserve">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#fff" height="18px" width="18px" version="1.1" id="Layer_1" viewBox="0 0 475.851 475.851" xml:space="preserve">
 <g>
 	<g>
 		<g>
@@ -405,6 +417,7 @@ const loadAllGroups = async () => {
 	</g>
 </g>
 </svg>
+<span style="color:white;font-size:13px">עדכון קבוצות</span>
   `;
   
   loadGroupsButton.onmouseover = () => {
@@ -545,3 +558,84 @@ export async function collectGroups() {
   
   return groupArray;
 }
+
+
+
+/**
+ * Simulates a drag and drop file operation on an element
+ * @param {HTMLElement} element - The element to drop the file on
+ * @param {File} file - The file to drop
+ * @returns {Promise<boolean>} - Whether the operation was successful
+ */
+export async function simulateDragAndDrop(element, file) {
+  try {
+    console.log('Simulating drag and drop for image upload...');
+    
+    // Create a DataTransfer object
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    
+    // Create and dispatch dragenter event
+    const dragEnterEvent = new DragEvent('dragenter', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer
+    });
+    element.dispatchEvent(dragEnterEvent);
+    await sleep(0.3);
+    
+    // Create and dispatch dragover event
+    const dragOverEvent = new DragEvent('dragover', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer
+    });
+    element.dispatchEvent(dragOverEvent);
+    await sleep(0.3);
+    
+    // Create and dispatch drop event
+    const dropEvent = new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer
+    });
+    element.dispatchEvent(dropEvent);
+    
+    console.log('Drag and drop simulation completed');
+    return true;
+  } catch (error) {
+    console.error('Error in drag and drop simulation:', error);
+    return false;
+  }
+}
+
+// Colorful console log functions
+
+export const colorLog = {
+  blue: (message, ...args) => {
+    console.log(`%c${message}`, 'color: #3498db; font-weight: bold;', ...args);
+  },
+  green: (message, ...args) => {
+    console.log(`%c${message}`, 'color: #2ecc71; font-weight: bold;', ...args);
+  },
+  red: (message, ...args) => {
+    console.error(`%c${message}`, 'color: #e74c3c; font-weight: bold;', ...args);
+  },
+  yellow: (message, ...args) => {
+    console.log(`%c${message}`, 'color: #f39c12; font-weight: bold;', ...args);
+  },
+  bold: {
+    blue: (message, ...args) => {
+      console.log(`%c${message}`, 'color: #3498db; font-weight: bold; font-size: 14px;', ...args);
+    },
+    green: (message, ...args) => {
+      console.log(`%c${message}`, 'color: #2ecc71; font-weight: bold; font-size: 14px;', ...args);
+    },
+    red: (message, ...args) => {
+      console.error(`%c${message}`, 'color: #e74c3c; font-weight: bold; font-size: 14px;', ...args);
+    },
+    yellow: (message, ...args) => {
+      console.log(`%c${message}`, 'color: #f39c12; font-weight: bold; font-size: 14px;', ...args);
+    }
+  }
+};
