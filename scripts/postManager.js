@@ -1,6 +1,7 @@
 import { authManager } from "./authManager";
 import { postToFacebook } from "./content";
-import { config, getPostById, serverIP, sleep } from "./utils";
+import {  getPostById, serverIP, sleep, updateBanner } from "./utils";
+import { WSClient } from "./wsClient";
 
 // State management
 const STATE_KEY = 'FB_AUTO_POST_STATE';
@@ -22,29 +23,51 @@ export class PostManager {
 
         this.updateTimer = null;
         this.state = this.loadState() || this.getInitialState();
-        this.startUpdateInterval();
     }
 
     async startUpdateInterval() {
         // Clear existing timer if any
-        await new Promise(resolve => setTimeout(resolve, 1*1e3));
         const interval = authManager.authProvider?.updateInterval * 60 * 1000 || UPDATE_INTERVAL;
         if (this.updateTimer) {
+            console.log('Clearing existing update interval...');
             clearInterval(this.updateTimer);
         }
 
         // Start new update interval
+        console.log(`Starting update interval: ${interval / 1000} seconds`);
+   
         this.updateTimer = setInterval(async () => {
             try {
-                await this.fetchPosts(true); // Force server update
-                console.log('Posts updated from server');
+                console.log('Refreshing posts...');
+                const posts = await this.fetchPosts(true); // Force server update
+                await updateBanner();
+                if (!posts?.length) {
+                    console.log('%c *** No posts found *** ', 'background: linear-gradient(to right, #90EE90, #228B22); color: black; padding: 2px 5px; border-radius: 8px; font-weight: bold; font-size: 18px; ');
+                    return false;
+                }
+    
+                // Updating sorted posts by start time
+                this.state.posts = this.sortPosts(posts);
+                // Update pending posts
+                this.state.pendingPosts = [...this.state.posts.filter(post => new Date(post.start) >= new Date())];
+                this.state.lastPostTime = null;
+                if (this.state.pendingPosts.length) {  
+                    this.state.currentPost = this.state.pendingPosts[0]?.id || null;
+                }
+                
+                this.saveState();
+                console.log('Queue Re-nitialized:', this.state);
+    
             } catch (error) {
                 console.error('Failed to update posts:', error);
             }
-        }, interval);
+        }, interval); 
     }
 
     async initialize() {
+        this.startUpdateInterval();
+        const ws =  new WSClient(serverIP.replace('http', 'ws'));
+        ws.connect();
         if (this.state.isProcessing) {
             console.log('Resuming existing queue...');
             return await this.resumeQueue();
@@ -58,7 +81,9 @@ export class PostManager {
                 return false;
             }
 
+            // Updating sorted posts by start time
             this.state.posts = this.sortPosts(posts);
+            // Update pending posts
             this.state.pendingPosts = [...this.state.posts.filter(post => new Date(post.start) >= new Date())];
             this.state.lastPostTime = null;
             if (this.state.pendingPosts.length) {  
@@ -107,12 +132,15 @@ export class PostManager {
       sessionStorage.setItem(STATE_KEY, JSON.stringify(this.state));
     }
 
-    clearState() {
+    async clearState() {
         if (this.updateTimer){
-            clearInterval(this.updateTimer);
-            clearInterval(this.intervalId)
+            // clearInterval(this.updateTimer);
+        }
+        if (this.state.intervalId){
+            clearInterval(this.state.intervalId);
         }
         sessionStorage.removeItem(STATE_KEY);
+        this.state = this.getInitialState();
     }
   
     async fetchPosts(serverUpdate = false) {
@@ -133,7 +161,7 @@ export class PostManager {
         return this.state.posts;
       }
       try{
-        console.log('Fetching posts from server...');
+        console.log('Updating posts from server...');
         const serverPosts = await fetch(`${serverIP}/getpost`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -149,8 +177,10 @@ export class PostManager {
                 img: Boolean(post.img),
             })));
             this.state.lastUpdate = new Date().toISOString();
-            await sleep(5)
+            this.state.pendingPosts = [...this.state.posts.filter(post => new Date(post.start) >= new Date())];
+            await sleep(2);
             this.saveState();
+            await updateBanner();
         }
         this.posts = this.sortPosts(posts);
         return this.state.posts;
@@ -180,7 +210,8 @@ export class PostManager {
     async scheduleNextPost() {
         if (!this.state?.pendingPosts?.length) {
             console.log('Completed posts!');
-            this.clearState();
+            await this.clearState();
+            await updateBanner();
             return true;
         }
         if (!this.state?.pendingPosts?.length) {
@@ -190,7 +221,7 @@ export class PostManager {
         const nextPost = this.state?.pendingPosts[0];
         
         const scheduledTime = new Date(nextPost.start);
-        await sleep(5);
+        await sleep(2);
         const now = new Date();
         
         // Calculate delay with minimum timeout
@@ -198,10 +229,13 @@ export class PostManager {
         const timeSinceLastPost = this.state?.lastPostTime ? (now - new Date(this.state.lastPostTime)) : Infinity;
         const minDelay = Math.max(0, timeout - timeSinceLastPost);
         const scheduleDelay = Math.max(0, scheduledTime - now);
+        // console.log(`Scheduled time: ${scheduledTime}, Now: ${now}, Delay: ${scheduleDelay}`);
+        // console.log(`Time since last post: ${timeSinceLastPost}, Min delay: ${minDelay}`);
         const delay = Math.max(scheduleDelay, minDelay);
 
         console.log(`Scheduling next post:  "${nextPost.post?.slice(0,20) + '...'}" \n in ${delay/1*1e3}[s]`);
-        await sleep(5);
+        await updateBanner();
+        // await sleep(2);
         setTimeout(async () => {
             this.state.isProcessing = true;
             this.state.fulfilled = ((nextPost?.amount && nextPost?.amount === 1 )||(!nextPost.amount)) ? (nextPost?.fulfilled || []) : [];

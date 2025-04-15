@@ -40,12 +40,12 @@ export class AuthManager {
         sessionStorage.removeItem(AUTH_KEY);
     }
 
-    async login(username, password) {
+    async login(username, password, facebookId) {
         try {
             const response = await fetch(`${serverIP}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password, facebookId })
             });
 
             if (response.ok && this.authProvider && this.authProvider?.verify === 80) {

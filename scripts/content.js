@@ -1,6 +1,6 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
-import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop } from './utils';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop, getClientFbId } from './utils';
 
 
 // console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
@@ -450,6 +450,7 @@ const startApp = async () => {
   errorMessageApprove.style.textAlign = 'start';
   errorMessageApprove.style.visibility = 'hidden';
   dialog.appendChild(errorMessageApprove);
+
  
 
   loginButton.textContent = 'Login';
@@ -488,15 +489,17 @@ const startApp = async () => {
       }
     `;
     document.head.appendChild(styleSheet);
-    const isAuth =  await authManager.login(username, password);
+    const faceBookId = await getClientFbId();
+    console.log('FaceBookId', faceBookId);
+    const isAuth =  await authManager.login(username, password, faceBookId);
     if (isAuth.ok && userIn()) {
       console.log('%c +++ Login successful +++', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       document.body.removeChild(overlay);
       document.body.removeChild(dialog);
       
       postManager.initialize();
-      await createBanner()
-      await sleep(5)
+      await createBanner();
+      await sleep(1);
       // return await App();
     }
     else {
@@ -1350,11 +1353,18 @@ export const postToFacebook = async (post) => {
 
 async function initializePostomatic() {
   console.log('%c *** Postomatic Initializing *** ', 'background: linear-gradient(to right, #4ca1af, #c4e0e5); color: black ; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(30, 18, 43, 0.3); font-size: 20px; font-weight: bold;');
-  
+
   const approve = await getManagerApprove();
+
   if(!approve) return
+
   if (!config.appId || !config.projectId) return
-    
+
+  const beforeunload = (event) => {
+    postManager.clearState();
+    authManager.clearCredentials();
+  };
+  // window.addEventListener('beforeunload', beforeunload);
   // Check if already logged in
   if (authManager.isLoggedIn()) {
     console.log(`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
@@ -1384,12 +1394,13 @@ async function initializePostomatic() {
   }
 
   // Show login UI if needed
-  if (window.location.href === 'https://www.facebook.com/') {
+  if (window.location.href.includes('https://www.facebook.com/')) {
+    console.log('%c +++ Login to Postomatic +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       await startApp();
-  }
-  else if (!authManager.isLoggedIn()) {
-    console.log('%c *** Go to home page to login to postomatic *** ', 'background: linear-gradient(to right, #ffd700, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
-    console.log('https://www.facebook.com/');
+  } else {
+    console.log('%c *** User is already logged in *** ', 'background: linear-gradient(to right, #98fb98, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
+    console.log('%c +++ Redirecting to Facebook login page +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+    window.location.href = 'https://www.facebook.com/';
   }
 
 
