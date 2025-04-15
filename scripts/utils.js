@@ -3,7 +3,7 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { authManager } from './authManager';
 import { postManager } from './postManager';
 
-export const production = true // chrome.runtime.getManifest().production;
+export const production = chrome.runtime.getManifest().production;
 console.log('Production:', production); 
 export const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
 
@@ -285,13 +285,13 @@ export const updateBanner = async (stateInfoElement) => {
               justify-content: start;
               gap: 4px;
               flex-wrap: wrap;
-              max-width: 90%;
               width: fit-content;
             }
             .group-buttons span {
               display: flex;
               align-items: center;
               justify-content: center;
+              flex-wrap: nowrap;
               cursor: pointer;
               padding: 4px 8px;
               flex: 0 0 auto;
