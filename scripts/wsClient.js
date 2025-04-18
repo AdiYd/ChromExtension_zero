@@ -10,7 +10,6 @@ export class WSClient {
   }
 
   connect() { 
-    
     // Use Socket.IO client instead of native WebSocket
     this.socket = io(this.url, {withCredentials: true});
     
@@ -18,35 +17,43 @@ export class WSClient {
     this.socket.on('connect', () => {
       console.log('Socket.IO connected');
       // Emit the event using Socket.IO format
-      this.socket.emit('connect_frontend',{...authManager.credentials});
+      this.socket.emit('connect_frontend', {...authManager.credentials});
     });
     
-    // Message event
+    // Message event - when server notifies about new post
     this.socket.on('post_updated', async (data) => {
-      postManager.clearState();
+      console.log('Received post update notification from server:', data);
       try {
-        console.log('Received post update:', data);
-        const posts = await postManager.fetchPosts(true); // Force server update
-        if (!posts?.length) {
-            console.log('%c *** No posts found *** ', 'background: linear-gradient(to right, #90EE90, #228B22); color: black; padding: 2px 5px; border-radius: 8px; font-weight: bold; font-size: 18px; ');
-            return false;
-        }
-
-        // Updating sorted posts by start time
-        postManager.state.posts = postManager.sortPosts(posts);
-        // Update pending posts
-        postManager.state.pendingPosts = [...postManager.state.posts.filter(post => new Date(post.start) >= new Date())];
-        postManager.state.lastPostTime = null;
-        if (postManager.state.pendingPosts.length) {  
-          postManager.state.currentPost = postManager.state.pendingPosts[0]?.id || null;
+        // Clear current state if we're not in the middle of posting
+        if (!postManager.state.isProcessing) {
+          await postManager.clearState();
+        } else {
+          console.log('Currently processing a post, will fetch next post after completion');
+          return;
         }
         
+        // Fetch the latest post from the server
+        const posts = await postManager.fetchPosts(true);
+        
+        if (!posts?.length) {
+          console.log('No posts available from server');
+          await updateBanner();
+          return;
+        }
+        
+        // Update state and start execution
+        postManager.state.posts = [...posts];
+        postManager.state.currentPost = posts[0]?.id || null;
         postManager.saveState();
+        
         await updateBanner();
         
-        return await postManager.scheduleNextPost();
+        // If not currently processing, start execution
+        if (!postManager.state.isProcessing) {
+          await postManager.executeCurrentPost();
+        }
       } catch(err) {
-        console.error('Error updating posts:', err);
+        console.error('Error handling post update:', err);
       }
     });
     
@@ -58,6 +65,13 @@ export class WSClient {
     // Disconnect event
     this.socket.on('disconnect', () => {
       console.log('Socket.IO disconnected');
+      // Attempt to reconnect after a delay
+      setTimeout(() => {
+        if (this.socket.disconnected) {
+          console.log('Attempting to reconnect...');
+          this.socket.connect();
+        }
+      }, 5000);
     });
   }
 }

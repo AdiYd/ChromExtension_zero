@@ -3,9 +3,8 @@ import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import { authManager } from './authManager';
 import { postManager } from './postManager';
 
-export const production = chrome.runtime.getManifest().production;
-console.log('Production:', production); 
-export const serverIP = production ? 'https://panel.taskomatic.net' : 'http://localhost:5000' ;
+export const production = true;
+export const serverIP = 'https://panel.taskomatic.net';
 
 export const config = {
     apiKey: process.env.FIREBASE_API_KEY,
@@ -207,12 +206,13 @@ export const updateBanner = async (stateInfoElement) => {
     const stateInfo = stateInfoElement || document.querySelector('#stateInfoPostomatic');
     if (!stateInfo) return;
     const state = postManager.state;
-    const nextPost = getPostById(state.currentPost);
+    const currentPost = getPostById(state.currentPost);
     const lastPost = getPostById(state.lastSuccessfulPost);
-    const nextPostGroups = nextPost ? nextPost.groups.map(group => group.groupName) : null;
-    const nextPostText = nextPost ? nextPost?.post?.substring(0, 45) + '...' : null;
+    const currentPostGroups = currentPost ? currentPost.groups.map(group => group.groupName) : null;
+    const currentPostText = currentPost ? currentPost?.post?.substring(0, 45) + '...' : null;
     const lastPostText = lastPost ? lastPost.post?.substring(0, 45) + '...' : null;
     const errors = state.errors?.slice(-2) || [];
+    
     stateInfo.innerHTML = `
     <div style="display: flex; justify-content: center; gap: 8px; align-items: center;">
       <div class="spinner" style="width: 18px; height: 18px; border: 3px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
@@ -226,7 +226,6 @@ export const updateBanner = async (stateInfoElement) => {
     </div>
     `;
 
-    let nextTime = 'לא מתוזמן';
     const stateInfoStyle = `
     <style>
       #stateInfoPostomatic div {
@@ -240,126 +239,122 @@ export const updateBanner = async (stateInfoElement) => {
     </style>
     `
     await sleep(1);
-    let i = 0;
-    while (!state.currentPost) {
-        await sleep(1);
-        i++;
-        if (i > 2) {
-            break;
-        }
-    }
-    if (!nextPost) {
-      if (state.intervalId) {
-        clearInterval(state.intervalId);
-        state.intervalId = null;
-      }
+    
+    // If no current post, display waiting status
+    if (!currentPost) {
       stateInfo.innerHTML = `
+       ${stateInfoStyle}
        <div style="display: flex; justify-content: center; align-items: center;">
-        <div style="margin-right: 10px; color: white;">לא נמצאו פוסטים מתוזמנים...</div>
-      </div>
+        <div style="margin-right: 10px; color: white;">מחכה לפוסט הבא מהשרת</div>
+       </div>
+       ${lastPostText ? `<div><b>פוסט אחרון: </b> ${lastPostText}</div>` : ''}
+       ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
       `;
       return;
     }
-    else if (nextPost && !state.isProcessing) {
-     
-      if (state.isProcessing) {
-        nextTime = 'עכשיו';
-      } else {
-        if (state.intervalId) {
-          clearInterval(state.intervalId);
-          state.intervalId = null;
-        }
-        const startDate = new Date(nextPost.start);
-        state.intervalId = setInterval(() => {
-          if (Date.now() >= startDate) {
-            nextTime = 'עכשיו';
-            clearInterval(state.intervalId);
-          } else {
-            nextTime = startDate.toLocaleTimeString();
-          }
-            const groupButton = (buttonsName= [])=> `
-            <style>
-            .group-buttons {
-              display: flex;
-              align-items: center;
-              justify-content: start;
-              gap: 4px;
-              flex-wrap: wrap;
-              width: fit-content;
-            }
-            .group-buttons span {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              flex-wrap: nowrap;
-              cursor: pointer;
-              padding: 4px 8px;
-              flex: 0 0 auto;
-              width: fit-content;
-              border-radius: 20px;
-              border: 1px solid rgba(224, 187, 149, 0.37);
-              transition: background-color 0.3s;
-              background-color: rgba(0, 0, 0, 0.1);
-              color: white;
-              font-size: 10px;
-            }
-            .group-buttons span:hover {
-              background-color: rgba(255, 255, 255, 0.1);
-            }
-            </style>
-            <div class="group-buttons">
-            ${buttonsName.map((name) => `
-              <span>${name}</span>`).join('')}
-            </div>
-            `
-         
-          stateInfo.innerHTML = `
-                ${stateInfoStyle}
-                ${nextPostText ? `<div><b>הפוסט הבא: </b> ${nextPostText}</div>` : ''}
-                                  <div><b>מתוזמן ל: </b> ${nextTime}</div>
-                ${ (startDate >= Date.now()) ? `<div><b >עולה בעוד: </b> ${new Date(startDate - Date.now()).toISOString().substr(11, 8)}  ${startDate.getDay() === 1 ? ' (היום)' : ` (+${startDate.getDay()-1} ימים)`} </div>` : ''}
-                ${nextPostGroups ? `<div style="display: block;"><b>לקבוצות: </b> ${groupButton(nextPostGroups)}</div>` : ''}
-                ${lastPostText ? `<div><b >הפוסט הקודם: </b> ${lastPostText}</div>` : ''}
-                ${errors?.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
-                `;
-        }, 1*1e3);
-      }
-    }
+    // If post is currently being processed
     else if (state.isProcessing) {
-      let postDelayed = 0;
-        const postDelayTimer = setInterval(() => {
-          if (state.postDelay*60 - postDelayed <= 0) {
-              delete state.postDelay;
-              clearInterval(postDelayTimer);
-              postDelayed = 0;
-            }
-            else {
-                stateInfo.innerHTML = `
-                ${stateInfoStyle}
-                ${nextPostText ? `<div><b>הפוסט שרץ: </b> ${nextPostText}</div>` : ''}
-                ${state.nextGroup ? `<div><b>קבוצה הבאה: </b> ${state.nextGroup}</div>` : ''}
-                ${state.postDelay ? `<div><b>הפוסט הבא יעלה בעוד: </b> ${Math.floor(state.postDelay*60 - postDelayed)} שניות</div>` : ''}
-                ${state.lastSuccessfulGroup ? `<div><b>קבוצה אחרונה: </b> ${state.lastSuccessfulGroup}</div>` : ''}
-                ${state.totalFullfilled ? `<div><b>כמות הקבוצות שהושלמו: </b> ${state.totalFullfilled}</div>` : ''}
-                ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
-                ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
-            `;
-            postDelayed += 1;
-            }
-          }, 1*1e3);
-      }
-    else{
+      const groupButton = (buttonsName = []) => `
+        <style>
+        .group-buttons {
+          display: flex;
+          align-items: center;
+          justify-content: start;
+          gap: 4px;
+          flex-wrap: wrap;
+          width: fit-content;
+          max-height: 150px;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        .group-buttons span {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: nowrap;
+          cursor: pointer;
+          padding: 4px 8px;
+          flex: 0 0 auto;
+          width: fit-content;
+          border-radius: 20px;
+          border: 1px solid rgba(224, 187, 149, 0.37);
+          transition: background-color 0.3s;
+          background-color: rgba(0, 0, 0, 0.1);
+          color: white;
+          font-size: 10px;
+        }
+        .group-buttons span:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+        </style>
+        <div class="group-buttons">
+        ${buttonsName.map((name) => `
+          <span>${name}</span>`).join('')}
+        </div>
+      `;
+      
       stateInfo.innerHTML = `
-      ${stateInfoStyle}
-      ${nextPostText ? `<div><b>הפוסט הבא: </b> ${nextPostText}</div>` : ''}
-      ${state.nextGroup ? `<div><b>קבוצה הבאה: </b> ${state.nextGroup}</div>` : ''}
-      ${state.lastSuccessfulGroup ? `<div><b>קבוצה אחרונה: </b> ${state.lastSuccessfulGroup}</div>` : ''}
-      ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
-      ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
-    `;
+        ${stateInfoStyle}
+        ${currentPostText ? `<div><b>הפוסט הנוכחי: </b> ${currentPostText}</div>` : ''}
+        ${state.nextGroup ? `<div><b>קבוצה הבאה: </b> ${state.nextGroup}</div>` : ''}
+        ${currentPostGroups ? `<div style="display: block;"><b>לקבוצות: </b> ${groupButton(currentPostGroups)}</div>` : ''}
+        ${state.lastSuccessfulGroup ? `<div><b>קבוצה אחרונה: </b> ${state.lastSuccessfulGroup}</div>` : ''}
+        ${state.totalFullfilled ? `<div><b>כמות הקבוצות שהושלמו: </b> ${state.totalFullfilled}</div>` : ''}
+        ${state.postDelay ? `<div><b>פוסט הבא יעלה בעוד: </b> ${Math.floor(state.postDelay*60)} שניות</div>` : ''}
+        ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
+        ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
+      `;
+    }
+    // Post is ready but not yet processing
+    else {
+      const groupButton = (buttonsName = []) => `
+        <style>
+        .group-buttons {
+          display: flex;
+          align-items: center;
+          justify-content: start;
+          gap: 4px;
+          flex-wrap: wrap;
+          width: fit-content;
+          max-height: 150px;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        .group-buttons span {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: nowrap;
+          cursor: pointer;
+          padding: 4px 8px;
+          flex: 0 0 auto;
+          width: fit-content;
+          border-radius: 20px;
+          border: 1px solid rgba(224, 187, 149, 0.37);
+          transition: background-color 0.3s;
+          background-color: rgba(0, 0, 0, 0.1);
+          color: white;
+          font-size: 10px;
+        }
+        .group-buttons span:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+        </style>
+        <div class="group-buttons">
+        ${buttonsName.map((name) => `
+          <span>${name}</span>`).join('')}
+        </div>
+      `;
+      
+      stateInfo.innerHTML = `
+        ${stateInfoStyle}
+        ${currentPostText ? `<div><b>הפוסט הבא: </b> ${currentPostText}</div>` : ''}
+        ${currentPostGroups ? `<div style="display: block;"><b>לקבוצות: </b> ${groupButton(currentPostGroups)}</div>` : ''}
+        ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
+        ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
+      `;
     }
     stateInfo.innerHTML += stateInfoStyle;
-
 }
 
 export const sleep = (s) => new Promise(resolve => setTimeout(resolve, s*1e3));
@@ -419,12 +414,14 @@ export const setFulfilled = async (postId, groupId) => {
             },
             body: JSON.stringify({ postId, groupId, ...credentials })
         });
+        
         if (!response.ok) {
-            const data = await response.json();
-            console.log('Fulfill response:', data);
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('Fulfill API returned error:', response.status, errorData);
             return false;
         }
         
+        console.log('Successfully marked group as fulfilled');
         return true;
     } catch (error) {
         console.error('Error setting fulfill:', error);
@@ -699,39 +696,110 @@ export async function simulateDragAndDrop(element, file) {
 // By looking the facebook menu at the top right corner
 export const getClientFbId = async () => {
   try {
-    // Find the navigation bar with the Shortcuts label
+    // Try multiple methods to find Facebook ID
+    
+    // Method 1: Check current URL if we're on a profile page
+    if (window.location.href.includes('/profile.php?id=')) {
+      const urlId = new URLSearchParams(window.location.search).get('id');
+      if (urlId) {
+        // colorLog.green(`Facebook ID found from URL: ${urlId}`);
+        return urlId;
+      }
+    } else if (window.location.pathname.split('/').filter(Boolean).length === 1) {
+      // URL format like facebook.com/username
+      const potentialUsername = window.location.pathname.split('/')[1];
+      if (potentialUsername && !['groups', 'pages', 'events', 'marketplace'].includes(potentialUsername)) {
+        // colorLog.green(`Facebook username found from URL: ${potentialUsername}`);
+        return potentialUsername;
+      }
+    }
+    
+    // Method 2: Check for User Profile Card (like in the provided example)
+    const profileCardElements = document.querySelectorAll('[role="main"] span.x1lliihq');
+    for (const element of profileCardElements) {
+      if (element.textContent && element.textContent.trim().length > 0) {
+        // Look for a nearby image with xlink:href containing facebook profile URL
+        const container = element.closest('.x1ja2u2z, .x1n2onr6');
+        if (container) {
+          const image = container.querySelector('image[xlink\\:href*="facebook"]');
+          if (image) {
+            const imageUrl = image.getAttribute('xlink:href');
+            if (imageUrl && imageUrl.includes('facebook')) {
+              // Extract ID from URL if numeric ID is present
+              const idMatch = imageUrl.match(/\/(\d+)_/);
+              if (idMatch && idMatch[1]) {
+                colorLog.green(`Facebook ID found from profile card: ${idMatch[1]}`);
+                return idMatch[1];
+              }
+              
+              // If we couldn't extract ID but found a name, use the name as profile identifier
+              colorLog.blue(`Using profile name as identifier: ${element.textContent.trim()}`);
+              return element.textContent.trim().replace(/\s+/g, '.');
+            }
+          }
+        }
+      }
+    }
+
+    // Method 3: Original method (for logged-in user)
     const navBar = document.querySelector('[aria-label="Shortcuts"][role="navigation"]');
-    if (!navBar) {
-      colorLog.yellow('Facebook navigation bar not found.');
-      return null;
+    if (navBar) {
+      const profileLink = navBar.querySelector('li:first-child a[role="link"]');
+      if (profileLink && profileLink.href) {
+        const fbUrl = profileLink.href;
+        
+        if (fbUrl.includes('facebook.com/')) {
+          const fbId = fbUrl.split('facebook.com/')[1].split('?')[0].split('/')[0];
+          if (fbId) {
+            // colorLog.green(`Facebook ID found from navigation: ${fbId}`);
+            return fbId;
+          }
+        }
+      }
     }
     
-    // Find the first link in the first list item, which should be the profile link
-    const profileLink = navBar.querySelector('li:first-child a[role="link"]');
-    if (!profileLink) {
-      colorLog.yellow('Profile link not found in navigation bar.');
-      return null;
+    // Method 4: Look for any element with a profile link
+    const potentialProfileLinks = document.querySelectorAll('a[href*="/profile.php?id="], a[href*="facebook.com/"]');
+    for (const link of potentialProfileLinks) {
+      const href = link.getAttribute('href');
+      if (href) {
+        if (href.includes('/profile.php?id=')) {
+          const idParam = href.split('/profile.php?id=')[1].split('&')[0];
+          if (idParam) {
+            colorLog.green(`Facebook ID found from profile link: ${idParam}`);
+            return idParam;
+          }
+        } else if (href.includes('facebook.com/')) {
+          const segments = href.split('facebook.com/')[1].split('?')[0].split('/');
+          if (segments.length > 0 && segments[0] && !['groups', 'pages', 'events', 'marketplace'].includes(segments[0])) {
+            // colorLog.green(`Facebook username found from link: ${segments[0]}`);
+            return segments[0];
+          }
+        }
+      }
     }
     
-    const fbUrl = profileLink.href;
-    // colorLog.blue(`Facebook profile URL found: ${fbUrl}`);
-    
-    // Extract the ID from the URL
-    if (!fbUrl.includes('facebook.com/')) {
-      colorLog.yellow('URL does not appear to be a Facebook profile URL.');
-      return null;
+    // Method 5: Try to extract from metadata
+    const metaProfileId = document.querySelector('meta[property="al:android:url"][content*="fb://profile/"]');
+    if (metaProfileId) {
+      const content = metaProfileId.getAttribute('content');
+      const idMatch = content.match(/fb:\/\/profile\/(\d+)/);
+      if (idMatch && idMatch[1]) {
+        // colorLog.green(`Facebook ID found from metadata: ${idMatch[1]}`);
+        return idMatch[1];
+      }
     }
-    
-    // Split by facebook.com/ and get the part after it
-    const fbId = fbUrl.split('facebook.com/')[1].split('?')[0].split('/')[0];
-    
-    if (!fbId) {
-      colorLog.red('Could not extract Facebook ID from URL.');
-      return null;
+
+    // If all methods fail, try to at least find a name to use as identifier
+    const nameElement = document.querySelector('h1[dir="auto"], .x1lliihq:not(:empty)');
+    if (nameElement && nameElement.textContent.trim()) {
+      const name = nameElement.textContent.trim();
+      // colorLog.yellow(`Could not find FB ID, using name as fallback: ${name}`);
+      return name.replace(/\s+/g, '.');
     }
-    
-    // colorLog.green(`Facebook ID found: ${fbId}`);
-    return fbId;
+
+    colorLog.red('Could not extract Facebook ID with any method');
+    return null;
   } catch (error) {
     colorLog.red(`Error getting Facebook ID: ${error.message}`);
     return null;

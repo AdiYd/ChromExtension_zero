@@ -5,7 +5,9 @@
   "main": "/scripts/content.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "webpack --config webpack.config.js"
+    "build": "webpack --config webpack.config.js",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +16,7 @@
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
     "dotenv-webpack": "^8.1.0",
-    "firebase": "^11.1.0",
+    "ignore-loader": "^0.1.2",
     "node-polyfill-webpack-plugin": "^4.1.0",
     "path-browserify": "^1.0.1",
     "rimraf": "^5.0.10",
@@ -23,6 +25,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "firebase": "^11.1.0"
   }
 }

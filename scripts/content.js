@@ -490,7 +490,7 @@ const startApp = async () => {
     `;
     document.head.appendChild(styleSheet);
     const faceBookId = await getClientFbId();
-    console.log('FaceBookId', faceBookId);
+    console.log(`%c @ FaceBook: ${faceBookId} `, 'font-size: 24px; font-weight: bold; background: linear-gradient(to right,rgb(215, 141, 12),rgb(219, 205, 12)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);');
     const isAuth =  await authManager.login(username, password, faceBookId);
     if (isAuth.ok && userIn()) {
       console.log('%c +++ Login successful +++', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
@@ -1279,7 +1279,6 @@ export const postToFacebook = async (post) => {
           throw new Error('Invalid post structure or groups');
       }
 
-
       for (let i = state.groupIndex; i < post.groups.length; i++) {
           // Update current execution state
           state.currentPost = post.id;
@@ -1309,6 +1308,8 @@ export const postToFacebook = async (post) => {
               const response = await setFulfilled(post.id, post.groups[i]?.id);
               if (response){
                 state.fulfilled.push(post.groups[i].id);
+              } else {
+                console.error('Failed to mark group as fulfilled in server');
               }
             }
             
@@ -1318,6 +1319,9 @@ export const postToFacebook = async (post) => {
             state.groupIndex = i + 1;
             state.lastPostTime = new Date().toISOString();
             postManager.saveState();
+            
+            await updateBanner(); // Update banner after each successful post
+            
             if (!(i === post.groups.length - 1)) {
               const postDelay = authManager.authProvider?.postDelay || (Math.random() * 3.5 + 1.5);
               state.postDelay = postDelay;
@@ -1360,11 +1364,6 @@ async function initializePostomatic() {
 
   if (!config.appId || !config.projectId) return
 
-  const beforeunload = (event) => {
-    postManager.clearState();
-    authManager.clearCredentials();
-  };
-  // window.addEventListener('beforeunload', beforeunload);
   // Check if already logged in
   if (authManager.isLoggedIn()) {
     console.log(`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
