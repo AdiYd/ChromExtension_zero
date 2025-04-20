@@ -18,6 +18,22 @@ export const config = {
 export const app = initializeApp(config);
 export const db = getFirestore(app);
 
+export const logProcess = (area, message, data = null) => {
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
+  const areaStyle = 'background:rgb(66, 44, 80); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;';
+  
+  console.log(
+    `%c[${area}]%c [${timestamp}] ${message}`, 
+    areaStyle, 
+    'color:rgb(110, 165, 197); font-weight: bold;'
+  );
+  
+  if (data && APP_CONFIG.DEBUG_MODE) {
+    console.log('→ Details:', data);
+  }
+};
+
+
 export const getAuth = async () => {
     const docRef = doc(db, 'mask', 'postomatic');
     const docSnap = await getDoc(docRef);
@@ -104,12 +120,17 @@ export const createBanner = async ()=>{
       absoluteCloseButton.style.opacity = '1';
     };
     absoluteCloseButton.onclick = async () => {
-      document.body.removeChild(notificationBanner);
-      postManager.clearState();
-      authManager.clearCredentials();
+      // First remove the UI element
+      if (document.body.contains(notificationBanner)) {
+        document.body.removeChild(notificationBanner);
+      }
+      
+      // Perform complete cleanup of all processes
+      performGlobalCleanup();
+      
       const logStyle = 'font-weight: bold; font-size: 16px; padding: 8px 15px; background-image: linear-gradient(45deg, #ff4500, #ff8c00); border-radius: 25px; color: black ; text-shadow: 2px 2px 4px rgba(45, 21, 47, 0.3)';
-      console.log('%c +++ Script execution finished! 🚀 +++ ', logStyle);  
-      await sleep(8);
+      console.log('%c +++ Script execution finished! 🚀 +++ ', logStyle);
+      
       return true;
     };
   
@@ -201,7 +222,13 @@ export const createBanner = async ()=>{
     document.body.appendChild(notificationBanner);
 };
 
+export const APP_CONFIG = {
+  PROCESS_DELAY: 5, // Default delay in seconds for process operations
+  DEBUG_MODE: true  // Enable detailed logging
+};
+
 export const updateBanner = async (stateInfoElement) => {
+    logProcess('BANNER', 'Updating banner UI');
     console.log(' ++ Updating banner ++');
     const stateInfo = stateInfoElement || document.querySelector('#stateInfoPostomatic');
     if (!stateInfo) return;
@@ -245,7 +272,7 @@ export const updateBanner = async (stateInfoElement) => {
       stateInfo.innerHTML = `
        ${stateInfoStyle}
        <div style="display: flex; justify-content: center; align-items: center;">
-        <div style="margin-right: 10px; color: white;">מחכה לפוסט הבא מהשרת</div>
+        <div style="color: white;"><b>מחכה לפוסט הבא מהשרת</b></div>
        </div>
        ${lastPostText ? `<div><b>פוסט אחרון: </b> ${lastPostText}</div>` : ''}
        ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
@@ -296,11 +323,7 @@ export const updateBanner = async (stateInfoElement) => {
       stateInfo.innerHTML = `
         ${stateInfoStyle}
         ${currentPostText ? `<div><b>הפוסט הנוכחי: </b> ${currentPostText}</div>` : ''}
-        ${state.nextGroup ? `<div><b>קבוצה הבאה: </b> ${state.nextGroup}</div>` : ''}
         ${currentPostGroups ? `<div style="display: block;"><b>לקבוצות: </b> ${groupButton(currentPostGroups)}</div>` : ''}
-        ${state.lastSuccessfulGroup ? `<div><b>קבוצה אחרונה: </b> ${state.lastSuccessfulGroup}</div>` : ''}
-        ${state.totalFullfilled ? `<div><b>כמות הקבוצות שהושלמו: </b> ${state.totalFullfilled}</div>` : ''}
-        ${state.postDelay ? `<div><b>פוסט הבא יעלה בעוד: </b> ${Math.floor(state.postDelay*60)} שניות</div>` : ''}
         ${lastPostText ? `<div><b>פוסט קודם: </b> ${lastPostText}</div>` : ''}
         ${errors.map(e => `<div style="color: #ff6b6b">Error: ${e.message}</div>`).slice(0,3)?.join('')}
       `;
@@ -357,7 +380,113 @@ export const updateBanner = async (stateInfoElement) => {
     stateInfo.innerHTML += stateInfoStyle;
 }
 
-export const sleep = (s) => new Promise(resolve => setTimeout(resolve, s*1e3));
+// Global abort controller for fetch requests
+export const fetchController = {
+  controller: new AbortController(),
+  signal: null,
+  
+  initialize() {
+    this.controller = new AbortController();
+    this.signal = this.controller.signal;
+    logProcess('FETCH', 'Fetch controller initialized');
+  },
+  
+  abort() {
+    logProcess('FETCH', 'Aborting all pending fetch requests');
+    this.controller.abort();
+    this.initialize(); // Reinitialize for future use
+  }
+};
+
+// Initialize the controller
+fetchController.initialize();
+
+// Global tracking of timeouts and intervals
+export const asyncTracking = {
+  timeouts: new Set(),
+  intervals: new Set(),
+  
+  setTimeout(callback, delay) {
+    const id = setTimeout(() => {
+      this.timeouts.delete(id);
+      callback();
+    }, delay);
+    this.timeouts.add(id);
+    return id;
+  },
+  
+  setInterval(callback, delay) {
+    const id = setInterval(callback, delay);
+    this.intervals.add(id);
+    return id;
+  },
+  
+  clearAll() {
+    logProcess('CLEANUP', `Clearing ${this.timeouts.size} timeouts and ${this.intervals.size} intervals`);
+    // Clear all timeouts
+    this.timeouts.forEach(id => {
+      clearTimeout(id);
+    });
+    this.timeouts.clear();
+    
+    // Clear all intervals
+    this.intervals.forEach(id => {
+      clearInterval(id);
+    });
+    this.intervals.clear();
+    
+    logProcess('CLEANUP', 'All async operations cleared');
+  }
+};
+
+// Enhanced sleep function with timeout tracking
+export const sleep = async (s) => {
+  const seconds = typeof s === 'number' ? s : APP_CONFIG.PROCESS_DELAY;
+  if (APP_CONFIG.DEBUG_MODE) {
+    console.log(`Sleeping for ${seconds} seconds...`);
+  }
+  
+  return new Promise(resolve => {
+    const timeoutId = asyncTracking.setTimeout(() => resolve(), seconds * 1000);
+  });
+};
+
+// Global cleanup function
+export const performGlobalCleanup = () => {
+  logProcess('CLEANUP', 'Starting global cleanup process');
+  
+  // 1. Abort all fetch requests
+  fetchController.abort();
+  
+  // 2. Clear all timeouts and intervals
+  asyncTracking.clearAll();
+  
+  // 3. Cleanup WebSocket connections
+  if (window.wsClient) {
+    window.wsClient.disconnect();
+  }
+  
+  // 4. Cleanup postManager
+  if (postManager) {
+    postManager.cleanup();
+  }
+  
+  // 5. Clear auth credentials
+  if (authManager) {
+    authManager.clearCredentials();
+  }
+  
+  logProcess('CLEANUP', 'Global cleanup completed');
+};
+
+export const sleep2 = async (s) => {
+  const seconds = typeof s === 'number' ? s : APP_CONFIG.PROCESS_DELAY;
+  if (APP_CONFIG.DEBUG_MODE) {
+    console.log(`Sleeping for ${seconds} seconds...`);
+  }
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+};
+
 
 export const getPostById = (postId) => {
     return postManager.state.posts.find(post => post.id === postId);
@@ -402,32 +531,6 @@ export const parsePostTime = (timeStr) => {
       return null;
     }
   };
-
-export const setFulfilled = async (postId, groupId) => {
-    try {
-        console.log('Setting fulfill:', postId, groupId);
-        const credentials = authManager.credentials || {};
-        const response = await fetch(`${serverIP}/setfullfield`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ postId, groupId, ...credentials })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-            console.error('Fulfill API returned error:', response.status, errorData);
-            return false;
-        }
-        
-        console.log('Successfully marked group as fulfilled');
-        return true;
-    } catch (error) {
-        console.error('Error setting fulfill:', error);
-        return false;
-    }
-}
 
 export async function simulateTyping(inputEl, text) {
     for (const char of text) {

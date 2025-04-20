@@ -1,77 +1,135 @@
 import { postManager } from './postManager';
 import { io } from 'socket.io-client';
-import { serverIP, updateBanner } from './utils';
+import { updateBanner, APP_CONFIG, sleep, logProcess } from './utils';
 import { authManager } from './authManager';
+
+const serverIP = 'https://panel.taskomatic.net';
 
 export class WSClient {
   constructor(url) {
     this.url = url || serverIP.replace('http', 'ws');
     this.socket = null;
+    this.credentials = null;
   }
 
-  connect() { 
+  connect(credentials = null) { 
+    logProcess('WEBSOCKET', 'Connecting to server', this.url);
+    
+    // If credentials not provided, try to get them from authManager
+    const authCredentials = credentials || authManager.credentials;
+    
+    if (!authCredentials) {
+        logProcess('ERROR', 'No authentication credentials available for WebSocket connection');
+        return false;
+    }
+    
+    // Store for future reference
+    this.credentials = authCredentials;
+    
     // Use Socket.IO client instead of native WebSocket
     this.socket = io(this.url, {withCredentials: true});
     
     // Connection event
     this.socket.on('connect', () => {
-      console.log('Socket.IO connected');
-      // Emit the event using Socket.IO format
-      this.socket.emit('connect_frontend', {...authManager.credentials});
+        logProcess('WEBSOCKET', 'Socket.IO connected');
+        
+        // Emit the event using Socket.IO format with stored credentials
+        this.socket.emit('connect_frontend', {...this.credentials});
+        logProcess('WEBSOCKET', 'Sent frontend connection credentials to server');
     });
     
     // Message event - when server notifies about new post
     this.socket.on('post_updated', async (data) => {
-      console.log('Received post update notification from server:', data);
+      logProcess('WEBSOCKET', 'Received post update notification from server', data);
+      
       try {
-        // Clear current state if we're not in the middle of posting
-        if (!postManager.state.isProcessing) {
-          await postManager.clearState();
-        } else {
-          console.log('Currently processing a post, will fetch next post after completion');
+        // Safety check - if already processing, don't interrupt
+        if (postManager.state.isProcessing) {
+          logProcess('WEBSOCKET', 'Currently processing a post, ignoring new post');
           return;
         }
         
-        // Fetch the latest post from the server
-        const posts = await postManager.fetchPosts(true);
-        
-        if (!posts?.length) {
-          console.log('No posts available from server');
-          await updateBanner();
+        // Check if we received a post object directly
+        const postData = data.post || data;
+        if (!postData || !postData.id) {
+          logProcess('ERROR', 'Invalid post data received from server', postData);
           return;
         }
         
-        // Update state and start execution
-        postManager.state.posts = [...posts];
-        postManager.state.currentPost = posts[0]?.id || null;
+        // Reset state for new post
+        logProcess('WEBSOCKET', 'Clearing state before processing new post');
+        await postManager.clearState();
+        await sleep(APP_CONFIG.PROCESS_DELAY);
+        
+        // Update state with the received post
+        logProcess('WEBSOCKET', `Received post ${postData.id} for execution`, postData);
+        postManager.state.posts = [postData];
+        postManager.state.currentPost = postData.id;
         postManager.saveState();
         
         await updateBanner();
+        await sleep(10); // 10 second delay before executing post
         
-        // If not currently processing, start execution
-        if (!postManager.state.isProcessing) {
-          await postManager.executeCurrentPost();
-        }
+        // Execute the post
+        logProcess('WEBSOCKET', 'Starting post execution');
+        await postManager.executeCurrentPost();
+        
       } catch(err) {
-        console.error('Error handling post update:', err);
+        logProcess('ERROR', `Error handling post update: ${err.message}`);
+        // Ensure we're not stuck in processing state in case of error
+        if (postManager.state.isProcessing) {
+          postManager.state.isProcessing = false;
+          postManager.saveState();
+        }
       }
     });
     
     // Error handling
     this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      logProcess('ERROR', `Socket error: ${error.message || error}`);
     });
     
     // Disconnect event
     this.socket.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
+      logProcess('WEBSOCKET', 'Socket.IO disconnected');
+      
       // Attempt to reconnect after a delay
       setTimeout(() => {
-        if (this.socket.disconnected) {
-          console.log('Attempting to reconnect...');
+        if (this.socket?.disconnected) {
+          logProcess('WEBSOCKET', 'Attempting to reconnect...');
           this.socket.connect();
         }
       }, 5000);
     });
   }
+
+  // Method to report group completion
+  sendGroupFulfillment(postId, groupId) {
+    if (!this.socket || !this.socket.connected) {
+      logProcess('ERROR', 'Cannot send fulfillment: WebSocket not connected');
+      return false;
+    }
+    
+    logProcess('WEBSOCKET', `Sending set_full_field for post=${postId}, group=${groupId}`);
+    this.socket.emit('set_full_field', {
+      postId,
+      groupId,
+      ...authManager.credentials
+    });
+    
+    return true;
+  }
+
+  // Disconnect method 
+  disconnect() {
+    logProcess('WEBSOCKET', 'Disconnecting WebSocket');
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      logProcess('WEBSOCKET', 'WebSocket disconnected');
+    }
+  }
 }
+
+// Export singleton instance
+export const wsClient = new WSClient();

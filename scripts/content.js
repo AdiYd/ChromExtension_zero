@@ -1,71 +1,8 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
-import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop, getClientFbId } from './utils';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop, getClientFbId, APP_CONFIG, logProcess, updateBanner } from './utils';
+import { WSClient } from './wsClient';
 
-
-// console.log('%c *** Welcome to Postomatic *** ', 'background: linear-gradient(to right,rgba(175, 234, 171, 0.79), #4ca1af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 20px; font-weight: bold;');
-
-
-// let posts = [
-//   {
-//     id: 2398432,
-//     post: 'This is my first automated live post! 😊',
-//     start: '2021-07-01 12:00:00',
-//     repeat: 24,
-//     amount: 5,
-//     groups: [{
-//       id: 392847324,
-//       groupId: 323958957681804,
-//       groupName: 'שותפים לסטארט אפ',
-//     }, 
-//     {
-//       id: 827678,
-//       groupId: 1920854911477422,
-//       groupName: 'דרושים מתכנתים ואנשי פיתוח',
-//     },
-//     {
-//       id: 239847239,
-//       groupId: 1943857349578934,
-//       groupName: 'שותפים fKחילחיגד אפ',
-//     },
-//     {
-//       id: 2398472879,
-//       groupId: null,
-//       groupName:'aichatgptisrael',
-//     }
-//     ],
-//     fulfilled: [239847239],
-//   },
-//   {
-//     id: 2398432,
-//     post: 'This is my Second post! 🎉',
-//     start: '2021-07-01 12:00:00',
-//     repeat: 24,
-//     amount: 5,
-//     groups: [{
-//       id: 8347568356,
-//       groupId: 1712618298975630,
-//       groupName: 'תאילנד שלנו',
-//     }, 
-//     {
-//       id: 827678,
-//       groupId: 1920854911477422,
-//       groupName: 'דרושים מתכנתים ואנשי פיתוח',
-//     },
-//     {
-//       id: 239847239,
-//       groupId: 1943857349578934,
-//       groupName: 'שותפים fKחילחיגד אפ',
-//     },
-//     {
-//       id: 2398472879,
-//       groupId: null,
-//       groupName:'aichatgptisrael',
-//     }
-//     ],
-//     fulfilled: [827678, 239847239, 2398472879],
-//   },
-// ]
 
 
 
@@ -536,7 +473,7 @@ const startApp = async () => {
     bottom: '5px',
     left: '50%',
     transform: 'translateX(-50%)',
-    textAlign: 'center',
+    textAlign : 'center',
     fontSize: '0.8rem',
     color: 'gray',
   };
@@ -656,17 +593,12 @@ export const postIntoInput = async (post, groupId) => {
   // אם יש תמונה, נעלה את הקובץ
   let postImage = post.img || null;  // Base64 image string
   if (postImage) {
-    
-      if (!postManager.posts) {
-          await postManager.fetchPosts(true);
-      }
-      const originalPost = postManager.posts?.find((p) => p.id === post.id);
-      if (originalPost) {
-          postImage = originalPost.img;
-      }else{
-        postImage = null;
-        colorLog.yellow('Image not found in posts, skipping upload...');
-      }
+    // Don't fetch posts unnecessarily
+    if (!postImage.startsWith('data:')) {
+      // Try to use the image directly from the post object
+      colorLog.yellow('Image format is not supported, skipping upload...');
+      postImage = null;
+    }
                 
     if (postImage && postImage.startsWith('data:')) {
       colorLog.bold.blue('Attempting to upload image...');
@@ -817,113 +749,6 @@ export const postIntoInput = async (post, groupId) => {
     }
   }
 
-  // אם יש תמונה, נעלה את הקובץ
-  // const postImage = post.img || null;  // Base64 image string
-  // if (postImage) {
-  //   colorLog.bold.blue('Attempting to upload image...');
-  //   try {
-  //     // Try multiple approaches for uploading
-  //     let uploaded = false;
-      
-  //     // Method 1: Look for the file input and set files
-  //     const imageInput = postInput;
-  //     colorLog.blue('Image input element:', imageInput);
-  //     if (imageInput) {
-  //       colorLog.blue('Image input element found, processing image...');
-        
-  //       // Extract the mime type from the data URL
-  //       let mimeType = 'image/png'; // Default fallback
-  //       let fileExtension = 'png';  // Default fallback
-        
-  //       try {
-  //         if (postImage.startsWith('data:')) {
-  //           const mimeMatch = postImage.match(/^data:([^;]+);/);
-  //           if (mimeMatch && mimeMatch[1]) {
-  //               mimeType = mimeMatch[1];
-  //               // Extract file extension from mime type
-  //               fileExtension = mimeType.split('/')[1] || 'png';
-  //               colorLog.blue(`Detected mime type: ${mimeType}`);
-  //           }
-  //         }
-  //       } catch (error) {
-  //           colorLog.yellow('Error detecting mime type, using default png');
-  //       }
-        
-  //       const blob = await (await fetch(postImage)).blob();
-  //       colorLog.blue(`Image blob created: ${blob.size} bytes, type: ${blob.type || mimeType}`);
-        
-  //       const file = new File([blob], `post-image.${fileExtension}`, { type: blob.type || mimeType });
-        
-  //       try {
-  //         // First try setting files directly
-  //         const dataTransfer = new DataTransfer();
-  //         dataTransfer.items.add(file);
-  //         imageInput.files = dataTransfer.files;
-          
-  //         // Dispatch change event
-  //         const changeEvent = new Event('change', { bubbles: true });
-  //         imageInput.dispatchEvent(changeEvent);
-  //         await sleep(2);
-  //         colorLog.bold.green('Image upload method 1 successful');
-  //         uploaded = true;
-  //       } catch (error) {
-  //         colorLog.yellow('Direct file assignment failed, trying alternative methods...');
-  //       }
-  //       // Method 2: Try clicking the Photo/Video button first
-  //       if (!uploaded) {
-  //         try {
-  //           // Find and click the photo/video button
-  //           const photoButtons = postDialog.querySelectorAll("div[aria-label='Photo/video'], img[alt=''], div.xc9qbxq");
-  //           for (const button of photoButtons) {
-  //             colorLog.blue('Attempting to click photo button...');
-  //             button.click();
-  //             await sleep(1);
-              
-  //             // Try to find the file input again after clicking
-  //             const newImageInput = postDialog.querySelector("input[type='file']");
-  //             if (newImageInput) {
-  //               const dataTransfer = new DataTransfer();
-  //               dataTransfer.items.add(file);
-  //               newImageInput.files = dataTransfer.files;
-                
-  //               const changeEvent = new Event('change', { bubbles: true });
-  //               newImageInput.dispatchEvent(changeEvent);
-  //               colorLog.bold.green('Image upload method 2 successful');
-  //               uploaded = true;
-  //               break;
-  //             }
-  //           }
-  //         } catch (error) {
-  //           colorLog.yellow('Method 2 failed:', error);
-  //         }
-  //       }
-  //       // Method 3: Simulate drag and drop onto the post input area
-  //       if (!uploaded) {
-  //         try {
-  //           const dragSuccess = await simulateDragAndDrop(postInput, file);
-  //           if (dragSuccess) {
-  //             colorLog.bold.green('Image upload via drag and drop successful');
-  //             uploaded = true;
-  //           }
-  //         } catch (error) {
-  //           colorLog.yellow('Method 3 failed:', error);
-  //         }
-  //       }
-          
-  //       if (uploaded) {
-  //         colorLog.bold.green('Image uploaded successfully!');
-  //       } else {
-  //         colorLog.yellow('All image upload methods failed, continuing without image');
-  //       }
-  //     } else {
-  //       colorLog.bold.red('ERROR: File input element not found for image upload');
-  //       colorLog.yellow('Proceeding with post without image...');
-  //     }
-  //     } catch (error) {
-  //       colorLog.bold.red('ERROR uploading image:', error);
-  //       colorLog.yellow('Will continue with post without image');
-  //     }
-  //   }
   // אם יש קישור, נכניס אותו
   const postLink = post.link || null;  // Link to be inserted
   if (postLink) {
@@ -1174,7 +999,6 @@ async function clickPostButton(postDialog, groupId) {
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסום')", // Hebrew Post span with class
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסם')", // Hebrew Post span with class
     "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסמי')", // Hebrew Post span with class
-    "div[tabindex='0'][role='button'] span.x1lliihq:contains('פרסם/פרסמי')", // Hebrew Post span with class
     ...(authManager?.authProvider?.postButtonSelectors || [])
   ];
 
@@ -1196,7 +1020,7 @@ async function clickPostButton(postDialog, groupId) {
   }
 
   console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
-  if (authManager.authProvider?.click && (production !== false)) {
+  if (authManager.authProvider?.click && (production === true)) {
     finalPostButton.click();
   }
   else {
@@ -1269,7 +1093,7 @@ export const postToGroup = async (post) => {
 
 export const postToFacebook = async (post) => {
   const state = postManager.state;
-  console.log('Post to Facebook:', post, postManager.state);
+  logProcess('POST', `Starting post execution for post ${post.id}`, post);
 
   try {
       if (!authManager.credentials || !authManager.isLoggedIn()) {
@@ -1286,10 +1110,14 @@ export const postToFacebook = async (post) => {
           state.totalFullfilled = `${state.fulfilled.length} / ${post.groups.length}`;
           state.groupIndex = i;
           postManager.saveState();
-          console.log('Posting in group:', post.groups[i].groupName); 
+          
+          logProcess('POST', `Posting in group ${i+1}/${post.groups.length}: ${post.groups[i].groupName}`); 
+          await sleep(APP_CONFIG.PROCESS_DELAY);
 
           const isPosted = await postToGroup(post);
           if (!isPosted.status) {
+              logProcess('ERROR', `Failed to post in group ${post.groups[i].groupName}: ${isPosted.message}`);
+              
               state.errors.push({
                   postId: post.id,
                   message: isPosted.message,
@@ -1305,11 +1133,21 @@ export const postToFacebook = async (post) => {
           else {
             // Update success state
             if (!isPosted.posted) {
-              const response = await setFulfilled(post.id, post.groups[i]?.id);
-              if (response){
+              logProcess('POST', `Marking group ${post.groups[i].groupName} as fulfilled`);
+              
+              // Use WebSocket instead of HTTP to report fulfillment
+              const success = postManager.reportGroupFulfilled(
+                post.id, 
+                post.groups[i]?.groupId || post.groups[i]?.id
+              );
+              
+              await sleep(APP_CONFIG.PROCESS_DELAY);
+              
+              if (success) {
+                logProcess('POST', `Successfully marked group ${post.groups[i].groupName} as fulfilled`);
                 state.fulfilled.push(post.groups[i].id);
               } else {
-                console.error('Failed to mark group as fulfilled in server');
+                logProcess('ERROR', `Failed to report group ${post.groups[i].groupName} as fulfilled`);
               }
             }
             
@@ -1324,6 +1162,8 @@ export const postToFacebook = async (post) => {
             
             if (!(i === post.groups.length - 1)) {
               const postDelay = authManager.authProvider?.postDelay || (Math.random() * 3.5 + 1.5);
+              logProcess('POST', `Waiting ${Math.round(postDelay * 60)} seconds before posting to next group`);
+              
               state.postDelay = postDelay;
               await sleep(postDelay * 60);
             }
@@ -1331,21 +1171,34 @@ export const postToFacebook = async (post) => {
       }
 
       // Post completed successfully
+      logProcess('POST', `Completed post ${post.id} to all groups`, {
+        groupsTotal: post.groups.length,
+        groupsCompleted: state.fulfilled.length
+      });
+      
       state.currentPost = null;
       state.groupIndex = 0;
       state.lastSuccessfulPost = post.id;
       state.fulfilled = [];
       state.isProcessing = false;
       postManager.saveState();
+      
+      await sleep(APP_CONFIG.PROCESS_DELAY);
+      await updateBanner();
+      
       return true;
       
   } catch (error) {
-      console.error('Post execution failed:', error);
+      logProcess('ERROR', `Post execution failed: ${error.message}`);
+      
       state.errors.push({
           postId: post.id,
           message: error.message,
           time: new Date().toISOString()
       });
+      
+      // Ensure we're not stuck in processing state
+      state.isProcessing = false;
       postManager.saveState();
       return false;
   }
@@ -1387,8 +1240,13 @@ async function initializePostomatic() {
         await sleep(8);
         window.location.href = 'https://www.facebook.com/';
       }
-      postManager.initialize();
-      await createBanner();
+      // Initialize with explicit check for credentials
+      const initSuccess = await postManager.initialize();
+      if (initSuccess) {
+          await createBanner();
+      } else {
+          console.error('Failed to initialize post manager - authentication issue');
+      }
       return;
   }
 
