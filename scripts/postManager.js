@@ -4,22 +4,22 @@ import { getPostById, sleep, updateBanner } from "./utils";
 import { wsClient } from "./wsClient";
 
 const APP_CONFIG = {
-    PROCESS_DELAY: 5, // Default delay in seconds for process operations
-    DEBUG_MODE: true  // Enable detailed logging
+    PROCESS_DELAY: 2, // Default delay in seconds for process operations
+    DEBUG_MODE: false  // Enable detailed logging
   };
 
 const logProcess = (area, message, data = null) => {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
     const areaStyle = 'background:rgb(66, 44, 80); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;';
     
-    console.log(
-      `%c[${area}]%c [${timestamp}] ${message}`, 
-      areaStyle, 
-      'color:rgb(110, 165, 197); font-weight: bold;'
-    );
+    // console.log(
+    //   `%c[${area}]%c [${timestamp}] ${message}`, 
+    //   areaStyle, 
+    //   'color:rgb(110, 165, 197); font-weight: bold;'
+    // );
     
     if (data && APP_CONFIG.DEBUG_MODE) {
-      console.log('→ Details:', data);
+    //   console.log('→ Details:', data);
     }
   };
   
@@ -194,8 +194,8 @@ export class PostManager {
     }
 
     // Helper to report group fulfillment via WebSocket
-    reportGroupFulfilled(postId, groupId) {
-        return wsClient.sendGroupFulfillment(postId, groupId);
+    async reportGroupFulfilled(postId, groupId) {
+        return await wsClient.sendGroupFulfillment(postId, groupId);
     }
 
     // Cleanup method

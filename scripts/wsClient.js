@@ -68,7 +68,7 @@ export class WSClient {
         postManager.saveState();
         
         await updateBanner();
-        await sleep(10); // 10 second delay before executing post
+        await sleep(2); // 10 second delay before executing post
         
         // Execute the post
         logProcess('WEBSOCKET', 'Starting post execution');
@@ -82,6 +82,15 @@ export class WSClient {
           postManager.saveState();
         }
       }
+    });
+
+    // Message event - when server want to show text in the banner
+    this.socket.on('UI_text', async (text) => {
+      logProcess('WEBSOCKET', 'Received banner message from server', text);
+      
+      // Update the banner with the received message
+      await updateBanner(undefined, text);
+      await sleep(2); // 10 second delay before executing post
     });
     
     // Error handling
@@ -104,12 +113,14 @@ export class WSClient {
   }
 
   // Method to report group completion
-  sendGroupFulfillment(postId, groupId) {
+  async sendGroupFulfillment(postId, groupId) {
     if (!this.socket || !this.socket.connected) {
       logProcess('ERROR', 'Cannot send fulfillment: WebSocket not connected');
       return false;
     }
     
+    postManager.state.isProcessing = false;
+    await postManager.saveState();
     logProcess('WEBSOCKET', `Sending set_full_field for post=${postId}, group=${groupId}`);
     this.socket.emit('set_full_field', {
       postId,

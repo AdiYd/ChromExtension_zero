@@ -20,16 +20,16 @@ export const db = getFirestore(app);
 
 export const logProcess = (area, message, data = null) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
-  const areaStyle = 'background:rgb(66, 44, 80); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;';
+  const areaStyle = area === 'WEBSOCKET' ? 'background:rgb(91, 6, 3); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;' :'background:rgb(44, 80, 63); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;';
   
-  console.log(
-    `%c[${area}]%c [${timestamp}] ${message}`, 
-    areaStyle, 
-    'color:rgb(110, 165, 197); font-weight: bold;'
-  );
+  // console.log(
+  //   `%c[${area}]%c [${timestamp}] ${message}`, 
+  //   areaStyle, 
+  //   'color:rgb(110, 165, 197); font-weight: bold;'
+  // );
   
   if (data && APP_CONFIG.DEBUG_MODE) {
-    console.log('→ Details:', data);
+    // console.log('→ Details:', data);
   }
 };
 
@@ -223,11 +223,11 @@ export const createBanner = async ()=>{
 };
 
 export const APP_CONFIG = {
-  PROCESS_DELAY: 5, // Default delay in seconds for process operations
-  DEBUG_MODE: true  // Enable detailed logging
+  PROCESS_DELAY: 2, // Default delay in seconds for process operations
+  DEBUG_MODE: false  // Enable detailed logging
 };
 
-export const updateBanner = async (stateInfoElement) => {
+export const updateBanner = async (stateInfoElement, text) => {
     logProcess('BANNER', 'Updating banner UI');
     console.log(' ++ Updating banner ++');
     const stateInfo = stateInfoElement || document.querySelector('#stateInfoPostomatic');
@@ -266,9 +266,19 @@ export const updateBanner = async (stateInfoElement) => {
     </style>
     `
     await sleep(1);
+
+    if (text) {
+      stateInfo.innerHTML = `
+        ${stateInfoStyle}
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <pre style="color: white;">${text}</pre>
+        </div>
+      `
+      return;
+    }
     
     // If no current post, display waiting status
-    if (!currentPost) {
+    if (!currentPost && !state.isProcessing) {
       stateInfo.innerHTML = `
        ${stateInfoStyle}
        <div style="display: flex; justify-content: center; align-items: center;">

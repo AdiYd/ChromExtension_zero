@@ -591,160 +591,162 @@ export const postIntoInput = async (post, groupId) => {
     // Replace your image upload code with this implementation
   
   // אם יש תמונה, נעלה את הקובץ
-  let postImage = post.img || null;  // Base64 image string
-  if (postImage) {
+  let postImageArray = post.img || [];  // Array of Base64 image string
+  if (postImageArray.length) {
     // Don't fetch posts unnecessarily
-    if (!postImage.startsWith('data:')) {
-      // Try to use the image directly from the post object
-      colorLog.yellow('Image format is not supported, skipping upload...');
-      postImage = null;
-    }
+    for (const postImage of postImageArray) {
+      if (!postImage.startsWith('data:')) {
+        // Try to use the image directly from the post object
+        colorLog.yellow('Image format is not supported, skipping upload...');
+        continue;
+      }
                 
-    if (postImage && postImage.startsWith('data:')) {
-      colorLog.bold.blue('Attempting to upload image...');
-      try {
-        // Try multiple approaches for uploading
-        let uploaded = false;
-        
-        // Find the actual file input element
-        const fileInputSelectors = [
-          "input[type='file']",
-          "input[accept*='image']",
-          "input[accept*='video']",
-          "input.x1s85apg",
-          ...(authManager?.authProvider?.fileInputSelectors || []),
-        ];
-        
-        // First, look for the file input
-        let fileInput = null;
-        for (const selector of fileInputSelectors) {
-          fileInput = postDialog.querySelector(selector);
-          if (fileInput) break;
-        }
-        
-        // If no file input found, try to click the Photo/Video button first
-        if (!fileInput) {
-          const photoButtonSelectors = [
-            "div[aria-label='Photo/video']",
-            "div[aria-label='תמונה/סרטון']", // Hebrew
-            "img[alt=''][src*='74AG-EvEtBm.png']", // Facebook's image icon
-            "div.xc9qbxq:has(img[src*='74AG'])",
-            ...(authManager?.authProvider?.photoButtonSelectors || []),
+      if (postImage && postImage.startsWith('data:')) {
+        colorLog.bold.blue('Attempting to upload image...');
+        try {
+          // Try multiple approaches for uploading
+          let uploaded = false;
+          
+          // Find the actual file input element
+          const fileInputSelectors = [
+            "input[type='file']",
+            "input[accept*='image']",
+            "input[accept*='video']",
+            "input.x1s85apg",
+            ...(authManager?.authProvider?.fileInputSelectors || []),
           ];
           
-          for (const selector of photoButtonSelectors) {
-            const photoButton = postDialog.querySelector(selector);
-            if (photoButton) {
-              colorLog.blue('Found photo button, clicking it...');
-              photoButton.click();
-              await sleep(1);
-              
-              // Now look again for the file input that should have appeared
-              for (const selector of fileInputSelectors) {
-                fileInput = postDialog.querySelector(selector);
-                if (fileInput) {
-                  colorLog.blue('Found file input after clicking Photo button');
-                  break;
+          // First, look for the file input
+          let fileInput = null;
+          for (const selector of fileInputSelectors) {
+            fileInput = postDialog.querySelector(selector);
+            if (fileInput) break;
+          }
+          
+          // If no file input found, try to click the Photo/Video button first
+          if (!fileInput) {
+            const photoButtonSelectors = [
+              "div[aria-label='Photo/video']",
+              "div[aria-label='תמונה/סרטון']", // Hebrew
+              "img[alt=''][src*='74AG-EvEtBm.png']", // Facebook's image icon
+              "div.xc9qbxq:has(img[src*='74AG'])",
+              ...(authManager?.authProvider?.photoButtonSelectors || []),
+            ];
+            
+            for (const selector of photoButtonSelectors) {
+              const photoButton = postDialog.querySelector(selector);
+              if (photoButton) {
+                colorLog.blue('Found photo button, clicking it...');
+                photoButton.click();
+                await sleep(1);
+                
+                // Now look again for the file input that should have appeared
+                for (const selector of fileInputSelectors) {
+                  fileInput = postDialog.querySelector(selector);
+                  if (fileInput) {
+                    colorLog.blue('Found file input after clicking Photo button');
+                    break;
+                  }
+                }
+                
+                if (fileInput) break;
+              }
+            }
+          }
+          
+          if (!fileInput) {
+            // If still not found, try a broader approach - look in the entire document
+            for (const selector of fileInputSelectors) {
+              fileInput = document.querySelector(selector);
+              if (fileInput) {
+                colorLog.blue('Found file input in document');
+                break;
+              }
+            }
+          }
+          
+          if (fileInput) {
+            colorLog.blue('File input element found:', fileInput);
+            
+            // Extract the mime type from the data URL
+            let mimeType = 'image/png'; // Default fallback
+            let fileExtension = 'png';  // Default fallback
+            
+            try {
+              if (postImage.startsWith('data:')) {
+                const mimeMatch = postImage.match(/^data:([^;]+);/);
+                if (mimeMatch && mimeMatch[1]) {
+                  mimeType = mimeMatch[1];
+                  fileExtension = mimeType.split('/')[1] || 'png';
+                  colorLog.blue(`Detected mime type: ${mimeType}`);
                 }
               }
-              
-              if (fileInput) break;
-            }
-          }
-        }
-        
-        if (!fileInput) {
-          // If still not found, try a broader approach - look in the entire document
-          for (const selector of fileInputSelectors) {
-            fileInput = document.querySelector(selector);
-            if (fileInput) {
-              colorLog.blue('Found file input in document');
-              break;
-            }
-          }
-        }
-        
-        if (fileInput) {
-          colorLog.blue('File input element found:', fileInput);
-          
-          // Extract the mime type from the data URL
-          let mimeType = 'image/png'; // Default fallback
-          let fileExtension = 'png';  // Default fallback
-          
-          try {
-            if (postImage.startsWith('data:')) {
-              const mimeMatch = postImage.match(/^data:([^;]+);/);
-              if (mimeMatch && mimeMatch[1]) {
-                mimeType = mimeMatch[1];
-                fileExtension = mimeType.split('/')[1] || 'png';
-                colorLog.blue(`Detected mime type: ${mimeType}`);
-              }
-            }
-          } catch (error) {
-            colorLog.yellow('Error detecting mime type, using default png');
-          }
-          
-          try {
-            // Convert data URL to blob
-            const blob = await (await fetch(postImage)).blob();
-            colorLog.blue(`Image blob created: ${blob.size} bytes, type: ${blob.type || mimeType}`);
-            
-            // Create File object
-            const file = new File([blob], `post-image.${fileExtension}`, { type: blob.type || mimeType });
-            
-            // Use DataTransfer to set the files property
-            try {
-              const dataTransfer = new DataTransfer();
-              dataTransfer.items.add(file);
-              fileInput.files = dataTransfer.files;
-              
-              // Dispatch change event to trigger Facebook's handlers
-              const changeEvent = new Event('change', { bubbles: true });
-              fileInput.dispatchEvent(changeEvent);
-              
-              colorLog.bold.green('Image upload successful');
-              uploaded = true;
             } catch (error) {
-              colorLog.yellow('DataTransfer method failed:', error);
+              colorLog.yellow('Error detecting mime type, using default png');
+            }
+            
+            try {
+              // Convert data URL to blob
+              const blob = await (await fetch(postImage)).blob();
+              colorLog.blue(`Image blob created: ${blob.size} bytes, type: ${blob.type || mimeType}`);
               
-              // Alternative approach using direct property assignment
+              // Create File object
+              const file = new File([blob], `post-image.${fileExtension}`, { type: blob.type || mimeType });
+              
+              // Use DataTransfer to set the files property
               try {
-                Object.defineProperty(fileInput, 'files', {
-                  value: [file],
-                  writable: true
-                });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
                 
+                // Dispatch change event to trigger Facebook's handlers
                 const changeEvent = new Event('change', { bubbles: true });
                 fileInput.dispatchEvent(changeEvent);
                 
-                colorLog.bold.green('Image upload via property definition successful');
+                colorLog.bold.green('Image upload successful');
                 uploaded = true;
               } catch (error) {
-                colorLog.yellow('Property definition method failed:', error);
+                colorLog.yellow('DataTransfer method failed:', error);
+                
+                // Alternative approach using direct property assignment
+                try {
+                  Object.defineProperty(fileInput, 'files', {
+                    value: [file],
+                    writable: true
+                  });
+                  
+                  const changeEvent = new Event('change', { bubbles: true });
+                  fileInput.dispatchEvent(changeEvent);
+                  
+                  colorLog.bold.green('Image upload via property definition successful');
+                  uploaded = true;
+                } catch (error) {
+                  colorLog.yellow('Property definition method failed:', error);
+                }
               }
+            } catch (error) {
+              colorLog.bold.red('Error processing image blob:', error);
             }
-          } catch (error) {
-            colorLog.bold.red('Error processing image blob:', error);
+          } else {
+            colorLog.bold.red('ERROR: File input element not found for image upload');
+            colorLog.green('Trying to drag and drop...');
+
+            // Extracting file from postImage (Base64 string)
+            const mimeType = postImage.split(';')[0].split(':')[1];
+            const base64Data = postImage.split(',')[1];
+            const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then(res => res.blob());
+            const file = new File([blob], 'post-image.png', { type: mimeType });
+
+            await simulateDragAndDrop(postInput, file);
           }
-        } else {
-          colorLog.bold.red('ERROR: File input element not found for image upload');
-          colorLog.green('Trying to drag and drop...');
-
-          // Extracting file from postImage (Base64 string)
-          const mimeType = postImage.split(';')[0].split(':')[1];
-          const base64Data = postImage.split(',')[1];
-          const blob = await fetch(`data:${mimeType};base64,${base64Data}`).then(res => res.blob());
-          const file = new File([blob], 'post-image.png', { type: mimeType });
-
-          await simulateDragAndDrop(postInput, file);
+          
+          if (!uploaded) {
+            colorLog.yellow('All image upload methods failed, proceeding with post without image...');
+          }
+        } catch (error) {
+          colorLog.bold.red('ERROR uploading image:', error);
+          colorLog.yellow('Will continue with post without image');
         }
-        
-        if (!uploaded) {
-          colorLog.yellow('All image upload methods failed, proceeding with post without image...');
-        }
-      } catch (error) {
-        colorLog.bold.red('ERROR uploading image:', error);
-        colorLog.yellow('Will continue with post without image');
       }
     }
   }
@@ -1032,7 +1034,7 @@ async function clickPostButton(postDialog, groupId) {
       console.log('Click event is blocked');
     }
   }
-  await sleep(10);
+  await sleep(2);
 
   return true;
 }
@@ -1065,7 +1067,7 @@ export const postToGroup = async (post) => {
       if (!window.location.href.includes(`/groups/${group.groupId}`)) {
           const url = `https://www.facebook.com/groups/${group.groupId}`;
           window.location.href = url;
-          await sleep(10);
+          await sleep(2);
           return {status: false, message: 'Navigating to group'};
       }
 
@@ -1136,7 +1138,7 @@ export const postToFacebook = async (post) => {
               logProcess('POST', `Marking group ${post.groups[i].groupName} as fulfilled`);
               
               // Use WebSocket instead of HTTP to report fulfillment
-              const success = postManager.reportGroupFulfilled(
+              const success = await postManager.reportGroupFulfilled(
                 post.id, 
                 post.groups[i]?.groupId || post.groups[i]?.id
               );
