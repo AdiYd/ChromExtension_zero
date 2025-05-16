@@ -1,6 +1,6 @@
 import { authManager, flag } from './authManager';
 import { postManager } from './postManager';
-import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop, getClientFbId, APP_CONFIG, logProcess, updateBanner } from './utils';
+import {  getManagerApprove,  waitForElement, production, sleep, setFulfilled, createBanner, config, simulateTyping, getNumberOfItemsFilter, collectGroups, serverIP, colorLog, simulateDragAndDrop, getClientFbId, APP_CONFIG, logProcess, updateBanner, getPostById } from './utils';
 import { WSClient } from './wsClient';
 
 
@@ -14,7 +14,7 @@ const startApp = async () => {
   };
 
   if (!window.location.href === 'https://www.facebook.com/') {
-    console.log('Go to home page to login');
+    logProcess('PostUrl','Go to home page to login');
     window.location.href = 'https://www.facebook.com/';
     return false;
   }
@@ -427,10 +427,10 @@ const startApp = async () => {
     `;
     document.head.appendChild(styleSheet);
     const faceBookId = await getClientFbId();
-    console.log(`%c @ FaceBook: ${faceBookId} `, 'font-size: 24px; font-weight: bold; background: linear-gradient(to right,rgb(215, 141, 12),rgb(219, 205, 12)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);');
+    logProcess('PostUrl',`%c @ FaceBook: ${faceBookId} `, 'font-size: 24px; font-weight: bold; background: linear-gradient(to right,rgb(215, 141, 12),rgb(219, 205, 12)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);');
     const isAuth =  await authManager.login(username, password, faceBookId);
     if (isAuth.ok && userIn()) {
-      console.log('%c +++ Login successful +++', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+      logProcess('PostUrl','%c +++ Login successful +++', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       document.body.removeChild(overlay);
       document.body.removeChild(dialog);
       
@@ -555,7 +555,7 @@ export const postIntoInput = async (post, groupId) => {
   }
 
   await sleep(2);
-  console.log('Post dialog:', postDialog);
+  logProcess('PostUrl','Post dialog:', postDialog);
 
   // 4) איתור אלמנט הקלט (contenteditable)
   //    אם צריך, הוסף/עדכן סלקטורים נוספים
@@ -582,10 +582,10 @@ export const postIntoInput = async (post, groupId) => {
     return false;
   }
 
-  console.log('Post input:', postInput);
+  logProcess('PostUrl','Post input:', postInput);
   postInput.focus();
   const postText = post.post?.trim() || '';
-  console.log('מנסה להזין טקסט:', postText);
+  logProcess('PostUrl','מנסה להזין טקסט:', postText);
   await sleep(1);
 
     // Replace your image upload code with this implementation
@@ -782,10 +782,10 @@ export const postIntoInput = async (post, groupId) => {
 
   // מכניס השהייה קצרה בין כל ניסיון
   for (let tries = option; tries <= 6; tries++) {
-    console.log(`נסה option=${tries} להזנת הטקסט`);
+    logProcess('PostUrl',`נסה option=${tries} להזנת הטקסט`);
     const success = await attemptTextInsertion(postInput, postText, tries);
     if (success) {
-      console.log(`option=${tries} הצליח!`);
+      logProcess('PostUrl',`option=${tries} הצליח!`);
       break;
     } else {
       console.warn(`option=${tries} לא הצליח, נמשיך ל-option=${tries+1}`);
@@ -1021,17 +1021,17 @@ async function clickPostButton(postDialog, groupId) {
     return false;
   }
 
-  console.log('%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
+  logProcess('PostUrl','%c +++ Clicking Post Button +++', 'color: pink; font-weight: bold; font-size: 16px');
   if (authManager.authProvider?.click && (production === true)) {
     finalPostButton.click();
   }
   else {
     if (groupId === '935474625023442' || groupId === 935474625023442) {
-      console.log('Test group - clicking Post button');
+      logProcess('PostUrl','Test group - clicking Post button');
       finalPostButton.click();
     }
     else {
-      console.log('Click event is blocked');
+      logProcess('PostUrl','Click event is blocked');
     }
   }
   await sleep(2);
@@ -1053,8 +1053,8 @@ export const postToGroup = async (post) => {
       group.groupId = group.groupId || group.groupid;
 
       // Check if already posted
-      if (state.fulfilled.includes(group.id) && (post.amount === getNumberOfItemsFilter(group.id, state.fulfilled))) {
-          console.log(`Already posted in group ${group.id}`);
+      if (state.fulfilled.includes(group.id)) {
+          logProcess('PostUrl',`Already posted in group ${group.id}`);
           return {status: true, message: 'Already posted', posted: true};
       }
 
@@ -1072,7 +1072,7 @@ export const postToGroup = async (post) => {
       }
 
       // Post content
-      console.log(`%c *** Posting in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg,rgb(213, 58, 66), #9400D3);');
+      logProcess('PostUrl',`%c *** Posting in group  ${group.groupName} *** `, 'color:rgb(198, 225, 252); font-size: 18px; border-radius: 12px; font-weight: 600; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg,rgb(213, 58, 66), #9400D3);');
       const posted = await postIntoInput(post, group.groupId);
       
       if (!posted) {
@@ -1082,7 +1082,7 @@ export const postToGroup = async (post) => {
           }
           return {status: false, message: 'Post failed'};
       }
-      console.log(`%c *** Posted in group 🎉 *** `, 'color:rgb(211, 224, 238); font-size: 18px; border-radius: 12px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
+      logProcess('PostUrl',`%c *** Posted in group 🎉 *** `, 'color:rgb(211, 224, 238); font-size: 18px; border-radius: 12px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background: linear-gradient(45deg, #2c3e50, #4ca1af);');
       // Reset retry counter on success
       state.retryCount = 0;
       postManager.saveState();
@@ -1119,7 +1119,12 @@ export const postToFacebook = async (post) => {
           const isPosted = await postToGroup(post);
           if (!isPosted.status) {
               logProcess('ERROR', `Failed to post in group ${post.groups[i].groupName}: ${isPosted.message}`);
-              
+              await postManager.reportGroupFulfilled(
+                post.id, 
+                post.groups[i]?.groupId || post.groups[i]?.id,
+                false,
+                isPosted.message
+              );
               state.errors.push({
                   postId: post.id,
                   message: isPosted.message,
@@ -1149,6 +1154,12 @@ export const postToFacebook = async (post) => {
                 logProcess('POST', `Successfully marked group ${post.groups[i].groupName} as fulfilled`);
                 state.fulfilled.push(post.groups[i].id);
               } else {
+                  await postManager.reportGroupFulfilled(
+                post.id, 
+                post.groups[i]?.groupId || post.groups[i]?.id,
+                false,
+                'Post already posted'
+              );
                 logProcess('ERROR', `Failed to report group ${post.groups[i].groupName} as fulfilled`);
               }
             }
@@ -1208,10 +1219,8 @@ export const postToFacebook = async (post) => {
 
 
 
-
-
 async function initializePostomatic() {
-  console.log('%c *** Postomatic Initializing *** ', 'background: linear-gradient(to right, #4ca1af, #c4e0e5); color: black ; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(30, 18, 43, 0.3); font-size: 20px; font-weight: bold;');
+  logProcess('PostUrl','%c *** Postomatic Initializing *** ', 'background: linear-gradient(to right, #4ca1af, #c4e0e5); color: black ; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(30, 18, 43, 0.3); font-size: 20px; font-weight: bold;');
 
   const approve = await getManagerApprove();
 
@@ -1221,11 +1230,11 @@ async function initializePostomatic() {
 
   // Check if already logged in
   if (authManager.isLoggedIn()) {
-    console.log(`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+    logProcess('PostUrl',`%c +++ ${authManager.credentials?.username || ''} logged in +++`, 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       if (window.location.href.includes('https://www.facebook.com/groups/joins/')) {
-        console.log('%c +++ Collecting groups data +++ ', 'font-weight: bold; color: #4CAF50; font-size: 16px');
+        logProcess('PostUrl','%c +++ Collecting groups data +++ ', 'font-weight: bold; color: #4CAF50; font-size: 16px');
         const groups = await collectGroups();
-        console.log('Collected groups:', groups);
+        logProcess('PostUrl','Collected groups:', groups);
         try {
           const setGroupsToServer = await fetch(`${serverIP}/setgroups`, {
                     method: 'POST',
@@ -1233,13 +1242,13 @@ async function initializePostomatic() {
                     body: JSON.stringify({...authManager.credentials, data: groups})
                 });
           if (setGroupsToServer.ok) {
-            console.log('Groups data sent to server');
+            logProcess('PostUrl','Groups data sent to server');
           }
         } catch (error) {
           console.error('Error sending groups data to server:', error);
           window.location.href = 'https://www.facebook.com/';
         }
-        await sleep(8);
+        await sleep(1);
         window.location.href = 'https://www.facebook.com/';
       }
       // Initialize with explicit check for credentials
@@ -1254,11 +1263,11 @@ async function initializePostomatic() {
 
   // Show login UI if needed
   if (window.location.href.includes('https://www.facebook.com/')) {
-    console.log('%c +++ Login to Postomatic +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+    logProcess('PostUrl','%c +++ Login to Postomatic +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
       await startApp();
   } else {
-    console.log('%c *** User is already logged in *** ', 'background: linear-gradient(to right, #98fb98, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
-    console.log('%c +++ Redirecting to Facebook login page +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
+    logProcess('PostUrl','%c *** User is already logged in *** ', 'background: linear-gradient(to right, #98fb98, #d3d3d3); color: black; font-weight: bold; font-size: 20px; padding: 4px 8px; border-radius: 8px;');
+    logProcess('PostUrl','%c +++ Redirecting to Facebook login page +++ ', 'background: linear-gradient(to right, #ff69b4, #ffa07a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 18px; font-weight: bold;');
     window.location.href = 'https://www.facebook.com/';
   }
 

@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Postomatics Extension",
-  "version": "3.8",
+  "version": "4.0",
   "description": "This extension will help you to schedule posts on facebook",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "web_accessible_resources": [
     {

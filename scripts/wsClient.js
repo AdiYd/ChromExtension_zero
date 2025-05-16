@@ -2,6 +2,7 @@ import { postManager } from './postManager';
 import { io } from 'socket.io-client';
 import { updateBanner, APP_CONFIG, sleep, logProcess } from './utils';
 import { authManager } from './authManager';
+import { getPostElement, getPostUrl, likePost } from './postHandler';
 
 const serverIP = 'https://panel.taskomatic.net';
 
@@ -30,9 +31,23 @@ export class WSClient {
     this.socket = io(this.url, {withCredentials: true});
     
     // Connection event
-    this.socket.on('connect', () => {
+    this.socket.on('connect', async () => {
         logProcess('WEBSOCKET', 'Socket.IO connected');
-        
+
+        // *********** Test some functions *********** //
+
+        const post = `כה עזרה. איך`;
+        const postElement = await getPostElement({post});
+        if (postElement) {
+            logProcess('WEBSOCKET', 'Successfully found post element', postElement);
+            const url = await getPostUrl(postElement);
+            logProcess('WEBSOCKET', 'Post URL:', url);
+        }
+
+
+        // *********** End test functions *********** //
+
+        // If credentials are provided, emit them to the server
         // Emit the event using Socket.IO format with stored credentials
         this.socket.emit('connect_frontend', {...this.credentials});
         logProcess('WEBSOCKET', 'Sent frontend connection credentials to server');
@@ -68,7 +83,7 @@ export class WSClient {
         postManager.saveState();
         
         await updateBanner();
-        await sleep(2); // 10 second delay before executing post
+        await sleep(1);
         
         // Execute the post
         logProcess('WEBSOCKET', 'Starting post execution');
@@ -113,18 +128,25 @@ export class WSClient {
   }
 
   // Method to report group completion
-  async sendGroupFulfillment(postId, groupId) {
+  async sendGroupFulfillment(postId, groupId, success=true, message='') {
     if (!this.socket || !this.socket.connected) {
       logProcess('ERROR', 'Cannot send fulfillment: WebSocket not connected');
       return false;
     }
     
     postManager.state.isProcessing = false;
-    await postManager.saveState();
+    if (!postManager.state.fulfilled.includes(groupId)) {
+      postManager.state.fulfilled.push(groupId);
+    }
+    postManager.saveState();
+   
+    await sleep(10);
     logProcess('WEBSOCKET', `Sending set_full_field for post=${postId}, group=${groupId}`);
     this.socket.emit('set_full_field', {
       postId,
       groupId,
+      success,
+      message,
       ...authManager.credentials
     });
     

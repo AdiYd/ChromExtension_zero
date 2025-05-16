@@ -84,7 +84,7 @@ export class PostManager {
             posts: [],              // Current post (in an array for API compatibility)
             
             // Current Execution
-            currentPost: null,      // Active post being processed
+            currentPost: null,      // Post id of the post that being processed
             groupIndex: 0,          // Current group index in post.groups
             fulfilled: [],          // Completed group IDs for current post
             
@@ -194,8 +194,8 @@ export class PostManager {
     }
 
     // Helper to report group fulfillment via WebSocket
-    async reportGroupFulfilled(postId, groupId) {
-        return await wsClient.sendGroupFulfillment(postId, groupId);
+    async reportGroupFulfilled(postId, groupId, success=true, message='') {
+        return await wsClient.sendGroupFulfillment(postId, groupId, success, message);
     }
 
     // Cleanup method

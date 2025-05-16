@@ -22,14 +22,14 @@ export const logProcess = (area, message, data = null) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
   const areaStyle = area === 'WEBSOCKET' ? 'background:rgb(91, 6, 3); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;' :'background:rgb(44, 80, 63); color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;';
   
-  // console.log(
-  //   `%c[${area}]%c [${timestamp}] ${message}`, 
-  //   areaStyle, 
-  //   'color:rgb(110, 165, 197); font-weight: bold;'
-  // );
+  console.log(
+    `%c[${area}]%c [${timestamp}] ${message}`, 
+    areaStyle, 
+    'color:rgb(110, 165, 197); font-weight: bold;'
+  );
   
   if (data && APP_CONFIG.DEBUG_MODE) {
-    // console.log('→ Details:', data);
+    console.log('→ Details:', data);
   }
 };
 
@@ -224,12 +224,11 @@ export const createBanner = async ()=>{
 
 export const APP_CONFIG = {
   PROCESS_DELAY: 2, // Default delay in seconds for process operations
-  DEBUG_MODE: false  // Enable detailed logging
+  DEBUG_MODE: true  // Enable detailed logging
 };
 
 export const updateBanner = async (stateInfoElement, text) => {
     logProcess('BANNER', 'Updating banner UI');
-    console.log(' ++ Updating banner ++');
     const stateInfo = stateInfoElement || document.querySelector('#stateInfoPostomatic');
     if (!stateInfo) return;
     const state = postManager.state;
@@ -268,12 +267,55 @@ export const updateBanner = async (stateInfoElement, text) => {
     await sleep(1);
 
     if (text) {
+      // Check if text contains a timer pattern "**<seconds>**"
+      const timerRegex = /\*\*(\d+(?:\.\d+)?)\*\*/;
+      const timerMatch = text.match(timerRegex);
+      
+      if (timerMatch) {
+        // Extract and round the seconds value to nearest positive integer
+        let seconds = Math.max(1, Math.round(parseFloat(timerMatch[1])));
+        const originalSeconds = seconds;
+        const timerPattern = timerMatch[0]; // The full "**<seconds>**" pattern
+        
+        // First render with initial value
+        let currentText = text.replace(timerPattern, seconds);
+        stateInfo.innerHTML = `
+          ${stateInfoStyle}
+          <div style="display: flex; justify-content: center; align-items: center;">
+          <pre style="color: white;">${currentText}</pre>
+          </div>
+        `;
+        
+        // Create interval for countdown
+        const timerId = asyncTracking.setInterval(() => {
+          seconds -= 1;
+          
+          // Update text with new seconds value
+          currentText = text.replace(timerPattern, seconds);
+          stateInfo.innerHTML = `
+          ${stateInfoStyle}
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <pre style="color: white;">${currentText}</pre>
+          </div>
+          `;
+          
+          // Clear interval when countdown reaches zero
+          if (seconds <= 0) {
+          clearInterval(timerId);
+          asyncTracking.intervals.delete(timerId);
+          }
+        }, 1000);
+        
+        return;
+      }
+      
+      // If no timer pattern found, display text as is
       stateInfo.innerHTML = `
-        ${stateInfoStyle}
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <pre style="color: white;">${text}</pre>
-        </div>
-      `
+      ${stateInfoStyle}
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <pre style="color: white;">${text}</pre>
+      </div>
+      `;
       return;
     }
     
